@@ -1,0 +1,10 @@
+{
+  "description": "Streamline your financial management with a user-friendly mobile app for recording transactions, featuring quick data import and AI categorization.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

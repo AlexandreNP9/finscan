@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react'
+import { Scanner } from '@yudiel/react-qr-scanner';
 
 const CameraIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,10 +77,50 @@ export default function App() {
 
   const subtotal = items.reduce((a, i) => a + (parseFloat(i.vlTotal.replace(',', '.')) || 0), 0)
 
+  const [isScanning, setIsScanning] = useState(false)
+  const [chaveAcesso, setChaveAcesso] = useState('')
+
   return (
     <div className="min-h-screen bg-[#f4f5f7] flex justify-center md:items-start md:py-10">
       {/* ── CONTAINER PRINCIPAL ── */}
       <div className="w-full max-w-[430px] md:max-w-[960px] md:bg-white md:rounded-2xl md:shadow-lg md:overflow-hidden flex flex-col relative">
+
+        {/* ── MODAL DO SCANNER ── */}
+        {isScanning && (
+          <div className="absolute inset-0 z-50 bg-black flex flex-col rounded-2xl overflow-hidden">
+            <div className="p-4 flex justify-between items-center bg-black/50 absolute top-0 w-full z-10">
+              <p className="text-white text-sm font-bold">Aponte para o QR Code da Nota</p>
+              <button
+                onClick={() => setIsScanning(false)}
+                className="text-white bg-white/20 px-3 py-1.5 rounded-lg text-xs"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center bg-black">
+              <Scanner
+                onScan={(result) => {
+                  if (result && result.length > 0) {
+                    const text = result[0].rawValue;
+                    console.log("QR Code lido:", text);
+
+                    // Tenta achar uma sequência de 44 números no link
+                    const matchChave = text.match(/\d{44}/);
+                    if (matchChave) {
+                      setChaveAcesso(matchChave[0]);
+                    } else {
+                      // Se não achar os 44 números, joga o link inteiro pra você ver
+                      setChaveAcesso(text);
+                    }
+                    setIsScanning(false);
+                  }
+                }}
+                onError={(error) => console.log(error)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* ── HEADER ── */}
         <header className="sticky top-0 z-20 bg-white border-b border-[#e8eaed]">
@@ -101,15 +142,18 @@ export default function App() {
 
           {/* ── COLUNA ESQUERDA (Automação e Dados Gerais) ── */}
           <div className="w-full md:w-[45%] flex flex-col gap-3">
-            
+
             {/* AUTOMAÇÃO */}
             <div className="bg-white rounded-xl border border-[#e8eaed] p-4 md:bg-[#f9fafb]">
               <p className="text-[11px] text-[#9ca3af] font-medium mb-2.5 flex items-center gap-1.5">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                 Importar dados da nota fiscal:
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <button className="flex items-center justify-center gap-2 px-3 py-2.5 border border-[#e8eaed] rounded-lg text-[11px] font-semibold text-[#374151] bg-[#f9fafb] md:bg-white hover:border-[#1d4ed8] hover:text-[#1d4ed8] hover:bg-[#eff2ff] transition-all active:scale-95">
+                <button
+                  onClick={() => setIsScanning(true)}
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 border border-[#e8eaed] rounded-lg text-[11px] font-semibold text-[#374151] bg-[#f9fafb] md:bg-white hover:border-[#1d4ed8] hover:text-[#1d4ed8] hover:bg-[#eff2ff] transition-all active:scale-95"
+                >
                   <CameraIcon />
                   Ler QR Code
                 </button>
@@ -159,6 +203,8 @@ export default function App() {
                     maxLength={44}
                     placeholder="00000000000000000000000000000000"
                     className={inp + ' font-mono text-xs tracking-wider'}
+                    value={chaveAcesso}
+                    onChange={(e) => setChaveAcesso(e.target.value)}
                   />
                 </div>
 
@@ -173,7 +219,7 @@ export default function App() {
                       <option>Cartão Bradesco Visa</option>
                       <option>Cartão XP Mastercard</option>
                     </select>
-                    <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                   </div>
                 </div>
 
@@ -188,7 +234,7 @@ export default function App() {
                       <option>Posto Ipiranga</option>
                       <option>Farmácia Drogasil</option>
                     </select>
-                    <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                   </div>
                 </div>
 
@@ -317,7 +363,7 @@ export default function App() {
                           >
                             {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
                           </select>
-                          <svg className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                          <svg className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
                         </div>
                       </div>
                     </div>

@@ -30,7 +30,9 @@ NextJS e Bootstrap
 
 ## Como rodar frontend
 cd frontend
-pnpm dev
+docker-compose up --build -d
+
+Acessar no localhost:3000
 
 ## 📄 Licença
 

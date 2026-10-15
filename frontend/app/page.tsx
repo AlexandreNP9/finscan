@@ -99,20 +99,32 @@ export default function App() {
 
             <div className="flex-1 flex items-center justify-center bg-black">
               <Scanner
-                onScan={(result) => {
+                onScan={async (result) => {
                   if (result && result.length > 0) {
                     const text = result[0].rawValue;
-                    console.log("QR Code lido:", text);
-
-                    // Tenta achar uma sequência de 44 números no link
-                    const matchChave = text.match(/\d{44}/);
-                    if (matchChave) {
-                      setChaveAcesso(matchChave[0]);
-                    } else {
-                      // Se não achar os 44 números, joga o link inteiro pra você ver
-                      setChaveAcesso(text);
-                    }
                     setIsScanning(false);
+
+                    // Opcional: Adicione um estado [isLoading, setIsLoading] = useState(false)
+                    // para mostrar um aviso na tela enquanto o scraping acontece
+
+                    try {
+                      const res = await fetch('/api/sefaz', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: text })
+                      });
+
+                      const data = await res.json();
+
+                      if (data.sucesso && data.itens.length > 0) {
+                        // Substitui os itens do formulário pelos itens da nota!
+                        setItems(data.itens);
+                      } else {
+                        alert('Não foi possível encontrar os itens nesta nota.');
+                      }
+                    } catch (error) {
+                      alert('Erro ao se comunicar com o servidor.');
+                    }
                   }
                 }}
                 onError={(error) => console.log(error)}

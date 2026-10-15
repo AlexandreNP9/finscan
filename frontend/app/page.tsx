@@ -77,8 +77,9 @@ export default function App() {
 
   const subtotal = items.reduce((a, i) => a + (parseFloat(i.vlTotal.replace(',', '.')) || 0), 0)
 
-  const [isScanning, setIsScanning] = useState(false)
-  const [chaveAcesso, setChaveAcesso] = useState('')
+  const [isScanning, setIsScanning] = useState(false);
+  const [chaveAcesso, setChaveAcesso] = useState('');
+  const [valorTotal, setValorTotal] = useState('');
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] flex justify-center md:items-start md:py-10">
@@ -100,20 +101,43 @@ export default function App() {
 
             <div className="flex-1 flex items-center justify-center bg-black">
               <Scanner
-                onScan={(result) => {
+                onScan={async (result) => {
                   if (result && result.length > 0) {
                     const text = result[0].rawValue;
-                    console.log("QR Code lido:", text);
-
-                    // Tenta achar uma sequência de 44 números no link
-                    const matchChave = text.match(/\d{44}/);
-                    if (matchChave) {
-                      setChaveAcesso(matchChave[0]);
-                    } else {
-                      // Se não achar os 44 números, joga o link inteiro pra você ver
-                      setChaveAcesso(text);
-                    }
                     setIsScanning(false);
+
+                    // Opcional: Adicione um estado [isLoading, setIsLoading] = useState(false)
+                    // para mostrar um aviso na tela enquanto o scraping acontece
+
+                    try {
+                      const res = await fetch('/api/sefaz', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: text })
+                      });
+
+                      const data = await res.json();
+
+                      if (data.sucesso && data.itens.length > 0) {
+                        // 1. Atualiza os Itens
+                        setItems(data.itens);
+
+                        // 2. Atualiza o Valor Total (veio da API do Cheerio)
+                        if (data.valorTotalNota) {
+                          setValorTotal(data.valorTotalNota);
+                        }
+
+                        // 3. Atualiza a Chave (extraindo 44 números direto da URL do QR Code lido)
+                        const matchChave = text.match(/\d{44}/);
+                        if (matchChave) {
+                          setChaveAcesso(matchChave[0]);
+                        }
+                      } else {
+                        alert('Não foi possível encontrar os itens nesta nota.');
+                      }
+                    } catch (error) {
+                      alert('Erro ao se comunicar com o servidor.');
+                    }
                   }
                 }}
                 onError={(error) => console.log(error)}
@@ -181,7 +205,8 @@ export default function App() {
                   <input
                     type="text"
                     placeholder="0,00"
-                    defaultValue="17,69"
+                    value={valorTotal}
+                    onChange={(e) => setValorTotal(e.target.value)}
                     className="flex-1 bg-transparent text-[32px] md:text-[36px] text-[#111827] outline-none border-b-2 border-[#1d4ed8]/30 focus:border-[#1d4ed8] pb-0.5 transition-colors placeholder-[#9ca3af]"
                     style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}
                   />
@@ -201,7 +226,7 @@ export default function App() {
                   <input
                     type="text"
                     maxLength={44}
-                    placeholder="00000000000000000000000000000000"
+                    placeholder="00000000000000000000000000000000000000000000"
                     className={inp + ' font-mono text-xs tracking-wider'}
                     value={chaveAcesso}
                     onChange={(e) => setChaveAcesso(e.target.value)}

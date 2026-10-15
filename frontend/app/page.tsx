@@ -77,272 +77,289 @@ export default function App() {
   const subtotal = items.reduce((a, i) => a + (parseFloat(i.vlTotal.replace(',', '.')) || 0), 0)
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] flex justify-center">
-      <div className="w-full max-w-[430px] flex flex-col relative">
+    <div className="min-h-screen bg-[#f4f5f7] flex justify-center md:items-start md:py-10">
+      {/* ── CONTAINER PRINCIPAL ── */}
+      <div className="w-full max-w-[430px] md:max-w-[960px] md:bg-white md:rounded-2xl md:shadow-lg md:overflow-hidden flex flex-col relative">
 
         {/* ── HEADER ── */}
         <header className="sticky top-0 z-20 bg-white border-b border-[#e8eaed]">
-          <div className="relative flex items-center justify-center px-4 py-3.5">
+          <div className="relative flex items-center justify-center px-4 py-3.5 md:py-5">
             <button className="absolute left-4 w-8 h-8 flex items-center justify-center rounded-lg text-[#6b7280] hover:bg-[#f4f5f7] transition-colors">
               <BackIcon />
             </button>
             <div className="text-center">
-              <h1 className="text-[15px] text-[#111827] leading-tight" style={{ fontWeight: 700 }}>
+              <h1 className="text-[15px] md:text-[18px] text-[#111827] leading-tight" style={{ fontWeight: 700 }}>
                 Nova Transação
               </h1>
-              <p className="text-[10px] text-[#9ca3af] tracking-wide mt-0.5">Cadastro de despesa</p>
+              <p className="text-[10px] md:text-[11px] text-[#9ca3af] tracking-wide mt-0.5">Cadastro de despesa</p>
             </div>
           </div>
         </header>
 
-        {/* ── SCROLL AREA ── */}
-        <div className="flex-1 overflow-y-auto pb-28 space-y-3 pt-3 px-4">
+        {/* ── ÁREA DE CONTEÚDO (DUAS COLUNAS NO DESKTOP) ── */}
+        <div className="flex-1 overflow-y-auto pb-28 md:pb-6 pt-3 px-4 md:px-6 space-y-3 md:space-y-0 md:flex md:gap-6">
 
-          {/* ── AUTOMAÇÃO ── */}
-          <div className="bg-white rounded-xl border border-[#e8eaed] p-4">
-            <p className="text-[11px] text-[#9ca3af] font-medium mb-2.5 flex items-center gap-1.5">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              Importar dados da nota fiscal:
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button className="flex items-center justify-center gap-2 px-3 py-2.5 border border-[#e8eaed] rounded-lg text-[11px] font-semibold text-[#374151] bg-[#f9fafb] hover:border-[#1d4ed8] hover:text-[#1d4ed8] hover:bg-[#eff2ff] transition-all active:scale-95">
-                <CameraIcon />
-                Ler QR Code
-              </button>
-              <button className="flex items-center justify-center gap-2 px-3 py-2.5 border border-[#e8eaed] rounded-lg text-[11px] font-semibold text-[#374151] bg-[#f9fafb] hover:border-[#1d4ed8] hover:text-[#1d4ed8] hover:bg-[#eff2ff] transition-all active:scale-95">
-                <KeyboardIcon />
-                Digitar Chave de Acesso
-              </button>
-            </div>
-          </div>
-
-          {/* ── DADOS GERAIS ── */}
-          <div className="bg-white rounded-xl border border-[#e8eaed] p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-[3px] h-[14px] bg-[#1d4ed8] rounded-full" />
-              <h2 className="text-[10px] font-bold text-[#374151] tracking-widest uppercase">Dados Gerais</h2>
-            </div>
-
-            {/* Valor em destaque */}
-            <div className="mb-4 bg-[#f0f4ff] border border-[#c7d7ff] rounded-xl p-4">
-              <label className="block text-[10px] font-bold text-[#1d4ed8] tracking-widest uppercase mb-2">
-                Valor Total (R$)
-              </label>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[13px] font-semibold text-[#374151]">R$</span>
-                <input
-                  type="text"
-                  placeholder="0,00"
-                  defaultValue="17,69"
-                  className="flex-1 bg-transparent text-[32px] text-[#111827] outline-none border-b-2 border-[#1d4ed8]/30 focus:border-[#1d4ed8] pb-0.5 transition-colors placeholder-[#9ca3af]"
-                  style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}
-                />
+          {/* ── COLUNA ESQUERDA (Automação e Dados Gerais) ── */}
+          <div className="w-full md:w-[45%] flex flex-col gap-3">
+            
+            {/* AUTOMAÇÃO */}
+            <div className="bg-white rounded-xl border border-[#e8eaed] p-4 md:bg-[#f9fafb]">
+              <p className="text-[11px] text-[#9ca3af] font-medium mb-2.5 flex items-center gap-1.5">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Importar dados da nota fiscal:
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="flex items-center justify-center gap-2 px-3 py-2.5 border border-[#e8eaed] rounded-lg text-[11px] font-semibold text-[#374151] bg-[#f9fafb] md:bg-white hover:border-[#1d4ed8] hover:text-[#1d4ed8] hover:bg-[#eff2ff] transition-all active:scale-95">
+                  <CameraIcon />
+                  Ler QR Code
+                </button>
+                <button className="flex items-center justify-center gap-2 px-3 py-2.5 border border-[#e8eaed] rounded-lg text-[11px] font-semibold text-[#374151] bg-[#f9fafb] md:bg-white hover:border-[#1d4ed8] hover:text-[#1d4ed8] hover:bg-[#eff2ff] transition-all active:scale-95">
+                  <KeyboardIcon />
+                  Chave de Acesso
+                </button>
               </div>
             </div>
 
-            <div className="space-y-3.5">
-              {/* Data */}
-              <div>
-                <label className={lbl}>Data da Transação</label>
-                <input type="date" className={inp} defaultValue="2026-09-21" />
+            {/* DADOS GERAIS */}
+            <div className="bg-white rounded-xl border border-[#e8eaed] p-4 md:border-none md:p-0">
+              <div className="flex items-center gap-2 mb-4 md:mb-5 md:mt-2">
+                <div className="w-[3px] h-[14px] bg-[#1d4ed8] rounded-full" />
+                <h2 className="text-[10px] font-bold text-[#374151] tracking-widest uppercase">Dados Gerais</h2>
               </div>
 
-              {/* Agente Origem */}
-              <div>
-                <label className={lbl}>Agente Origem (Quem paga)</label>
-                <div className="relative">
-                  <select className={inp + ' appearance-none pr-8'} defaultValue="">
-                    <option value="" disabled>Selecionar conta…</option>
-                    <option>Nubank – Conta Corrente</option>
-                    <option>Itaú – Conta Poupança</option>
-                    <option>Cartão Bradesco Visa</option>
-                    <option>Cartão XP Mastercard</option>
-                  </select>
-                  <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
-
-              {/* Agente Destino */}
-              <div>
-                <label className={lbl}>Agente Destino (Estabelecimento)</label>
-                <div className="relative">
-                  <select className={inp + ' appearance-none pr-8'} defaultValue="">
-                    <option value="" disabled>Selecionar estabelecimento…</option>
-                    <option>Supermercado Pão de Açúcar</option>
-                    <option>Mercado Extra</option>
-                    <option>Posto Ipiranga</option>
-                    <option>Farmácia Drogasil</option>
-                  </select>
-                  <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-              </div>
-
-              {/* Chave de Acesso */}
-              <div>
-                <label className={lbl}>Chave de Acesso (44 dígitos)</label>
-                <input
-                  type="text"
-                  maxLength={44}
-                  placeholder="00000000000000000000000000000000000000000000"
-                  className={inp + ' font-mono text-xs tracking-wider'}
-                  style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}
-                />
-              </div>
-
-              {/* Observações */}
-              <div>
-                <label className={lbl}>
-                  Observações da compra
-                  <span className="ml-1.5 text-[#9ca3af] font-normal normal-case tracking-normal">— opcional</span>
+              {/* Valor em destaque */}
+              <div className="mb-4 bg-[#f0f4ff] border border-[#c7d7ff] rounded-xl p-4">
+                <label className="block text-[10px] font-bold text-[#1d4ed8] tracking-widest uppercase mb-2">
+                  Valor Total (R$)
                 </label>
-                <textarea
-                  rows={2}
-                  placeholder="Compra semanal de mantimentos…"
-                  className={inp + ' resize-none'}
-                />
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[13px] font-semibold text-[#374151]">R$</span>
+                  <input
+                    type="text"
+                    placeholder="0,00"
+                    defaultValue="17,69"
+                    className="flex-1 bg-transparent text-[32px] md:text-[36px] text-[#111827] outline-none border-b-2 border-[#1d4ed8]/30 focus:border-[#1d4ed8] pb-0.5 transition-colors placeholder-[#9ca3af]"
+                    style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col md:grid md:grid-cols-2 gap-3.5">
+                {/* Data */}
+                <div className="col-span-1">
+                  <label className={lbl}>Data da Transação</label>
+                  <input type="date" className={inp} defaultValue="2026-09-21" />
+                </div>
+
+                {/* Chave de Acesso */}
+                <div className="col-span-1">
+                  <label className={lbl}>Chave de Acesso</label>
+                  <input
+                    type="text"
+                    maxLength={44}
+                    placeholder="00000000000000000000000000000000"
+                    className={inp + ' font-mono text-xs tracking-wider'}
+                  />
+                </div>
+
+                {/* Agente Origem */}
+                <div className="col-span-1">
+                  <label className={lbl}>Agente Origem (Quem paga)</label>
+                  <div className="relative">
+                    <select className={inp + ' appearance-none pr-8'} defaultValue="">
+                      <option value="" disabled>Selecionar conta…</option>
+                      <option>Nubank – Conta Corrente</option>
+                      <option>Itaú – Conta Poupança</option>
+                      <option>Cartão Bradesco Visa</option>
+                      <option>Cartão XP Mastercard</option>
+                    </select>
+                    <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                </div>
+
+                {/* Agente Destino */}
+                <div className="col-span-1">
+                  <label className={lbl}>Agente Destino (Onde)</label>
+                  <div className="relative">
+                    <select className={inp + ' appearance-none pr-8'} defaultValue="">
+                      <option value="" disabled>Selecionar local…</option>
+                      <option>Supermercado Pão de Açúcar</option>
+                      <option>Mercado Extra</option>
+                      <option>Posto Ipiranga</option>
+                      <option>Farmácia Drogasil</option>
+                    </select>
+                    <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                </div>
+
+                {/* Observações */}
+                <div className="col-span-full">
+                  <label className={lbl}>
+                    Observações da compra
+                    <span className="ml-1.5 text-[#9ca3af] font-normal normal-case tracking-normal">— opcional</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Compra semanal de mantimentos…"
+                    className={inp + ' resize-none'}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* ── ITENS ── */}
-          <div className="bg-white rounded-xl border border-[#e8eaed] p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-[3px] h-[14px] bg-[#7c3aed] rounded-full" />
-                <h2 className="text-[10px] font-bold text-[#374151] tracking-widest uppercase">Itens da Transação</h2>
+          {/* ── COLUNA DIREITA (Itens) ── */}
+          <div className="w-full md:w-[55%] flex flex-col gap-3">
+            <div className="bg-white rounded-xl border border-[#e8eaed] p-4 flex-1 flex flex-col md:border-none md:p-0 md:bg-transparent">
+              <div className="flex items-center justify-between mb-3 md:mt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-[3px] h-[14px] bg-[#7c3aed] rounded-full" />
+                  <h2 className="text-[10px] font-bold text-[#374151] tracking-widest uppercase">Itens da Transação</h2>
+                </div>
+                <span className="text-[11px] text-[#9ca3af]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {items.length} {items.length === 1 ? 'item' : 'itens'}
+                </span>
               </div>
-              <span className="text-[11px] text-[#9ca3af]" style={{ fontFamily: 'var(--font-mono)' }}>
-                {items.length} {items.length === 1 ? 'item' : 'itens'}
-              </span>
-            </div>
 
-            {/* IA */}
-            <button className="w-full flex items-center justify-center gap-2 py-2 mb-3.5 rounded-lg border border-[#7c3aed]/25 bg-[#faf5ff] text-[#7c3aed] text-[11px] font-semibold hover:bg-[#f3e8ff] hover:border-[#7c3aed]/50 transition-all active:scale-[0.98]">
-              <SparkleIcon />
-              Categorizar com IA
-            </button>
+              {/* IA */}
+              <button className="w-full flex items-center justify-center gap-2 py-2 mb-3.5 rounded-lg border border-[#7c3aed]/25 bg-[#faf5ff] text-[#7c3aed] text-[11px] font-semibold hover:bg-[#f3e8ff] hover:border-[#7c3aed]/50 transition-all active:scale-[0.98]">
+                <SparkleIcon />
+                Categorizar com IA
+              </button>
 
-            {/* Cards de produtos */}
-            <div className="space-y-2.5">
-              {items.map((item) => (
-                <div key={item.id} className="border border-[#e8eaed] rounded-xl overflow-hidden">
-                  {/* Linha topo: código + descrição + trash */}
-                  <div className="flex items-center gap-2 bg-[#f9fafb] px-3 py-2 border-b border-[#e8eaed]">
-                    <span className="text-[10px] font-bold text-[#9ca3af] tracking-wider shrink-0">#</span>
-                    <input
-                      type="text"
-                      value={item.codigo}
-                      onChange={e => upd(item.id, 'codigo', e.target.value)}
-                      placeholder="Cód"
-                      className="w-[38px] text-[11px] font-bold text-[#374151] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8] shrink-0"
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    />
-                    <div className="w-px h-3 bg-[#e8eaed] shrink-0" />
-                    <input
-                      type="text"
-                      value={item.descricao}
-                      onChange={e => upd(item.id, 'descricao', e.target.value)}
-                      placeholder="Descrição do produto…"
-                      className="flex-1 text-[12px] font-semibold text-[#111827] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8] min-w-0"
-                    />
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-[#d1d5db] hover:text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
-
-                  {/* Linha dados: qtd | un | vl.unit | vl.total | categoria */}
-                  <div className="px-3 py-2.5 grid gap-x-2" style={{ gridTemplateColumns: '36px 36px 1fr 1fr 100px' }}>
-                    {/* Qtd */}
-                    <div>
-                      <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">Qtd</p>
+              {/* Cards de produtos */}
+              <div className="space-y-2.5 overflow-y-auto pr-1">
+                {items.map((item) => (
+                  <div key={item.id} className="border border-[#e8eaed] rounded-xl overflow-hidden md:bg-white md:shadow-sm">
+                    {/* Linha topo */}
+                    <div className="flex items-center gap-2 bg-[#f9fafb] px-3 py-2 border-b border-[#e8eaed]">
+                      <span className="text-[10px] font-bold text-[#9ca3af] tracking-wider shrink-0">#</span>
                       <input
                         type="text"
-                        value={item.qtd}
-                        onChange={e => upd(item.id, 'qtd', e.target.value)}
-                        className="w-full text-[12px] text-center text-[#111827] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8]"
-                        style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}
-                      />
-                    </div>
-                    {/* UN */}
-                    <div>
-                      <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">UN</p>
-                      <input
-                        type="text"
-                        value={item.un}
-                        onChange={e => upd(item.id, 'un', e.target.value)}
-                        className="w-full text-[12px] text-center text-[#111827] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8]"
-                        style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}
-                      />
-                    </div>
-                    {/* Vl. Unit */}
-                    <div>
-                      <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">Vl. Unit</p>
-                      <input
-                        type="text"
-                        value={item.vlUnit}
-                        onChange={e => upd(item.id, 'vlUnit', e.target.value)}
-                        placeholder="0,00"
-                        className="w-full text-[12px] text-right text-[#374151] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8]"
+                        value={item.codigo}
+                        onChange={e => upd(item.id, 'codigo', e.target.value)}
+                        placeholder="Cód"
+                        className="w-[38px] text-[11px] font-bold text-[#374151] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8] shrink-0"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       />
-                    </div>
-                    {/* Vl. Total */}
-                    <div>
-                      <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">Vl. Total</p>
+                      <div className="w-px h-3 bg-[#e8eaed] shrink-0" />
                       <input
                         type="text"
-                        value={item.vlTotal}
-                        onChange={e => upd(item.id, 'vlTotal', e.target.value)}
-                        placeholder="0,00"
-                        className="w-full text-[12px] text-right font-bold text-[#111827] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8]"
-                        style={{ fontFamily: 'var(--font-mono)' }}
+                        value={item.descricao}
+                        onChange={e => upd(item.id, 'descricao', e.target.value)}
+                        placeholder="Descrição do produto…"
+                        className="flex-1 text-[12px] font-semibold text-[#111827] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8] min-w-0"
                       />
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-[#d1d5db] hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <TrashIcon />
+                      </button>
                     </div>
-                    {/* Categoria */}
-                    <div>
-                      <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">Categoria</p>
-                      <div className="relative">
-                        <select
-                          value={item.categoria}
-                          onChange={e => upd(item.id, 'categoria', e.target.value)}
-                          className="w-full text-[10px] font-semibold text-[#374151] bg-[#f4f5f7] border border-[#e8eaed] rounded-md px-1.5 py-0.5 outline-none appearance-none pr-4 focus:border-[#1d4ed8] transition-colors"
-                        >
-                          {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
-                        </select>
-                        <svg className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+
+                    {/* Linha dados convertida para Tailwind arbitrary grid */}
+                    <div className="px-3 py-2.5 grid gap-x-2 grid-cols-[36px_36px_1fr_1fr_100px] md:grid-cols-[40px_40px_1fr_1fr_120px]">
+                      {/* Qtd */}
+                      <div>
+                        <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">Qtd</p>
+                        <input
+                          type="text"
+                          value={item.qtd}
+                          onChange={e => upd(item.id, 'qtd', e.target.value)}
+                          className="w-full text-[12px] text-center text-[#111827] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8]"
+                          style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}
+                        />
+                      </div>
+                      {/* UN */}
+                      <div>
+                        <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">UN</p>
+                        <input
+                          type="text"
+                          value={item.un}
+                          onChange={e => upd(item.id, 'un', e.target.value)}
+                          className="w-full text-[12px] text-center text-[#111827] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8]"
+                          style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}
+                        />
+                      </div>
+                      {/* Vl. Unit */}
+                      <div>
+                        <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">Vl. Unit</p>
+                        <input
+                          type="text"
+                          value={item.vlUnit}
+                          onChange={e => upd(item.id, 'vlUnit', e.target.value)}
+                          placeholder="0,00"
+                          className="w-full text-[12px] text-right text-[#374151] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8]"
+                          style={{ fontFamily: 'var(--font-mono)' }}
+                        />
+                      </div>
+                      {/* Vl. Total */}
+                      <div>
+                        <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">Vl. Total</p>
+                        <input
+                          type="text"
+                          value={item.vlTotal}
+                          onChange={e => upd(item.id, 'vlTotal', e.target.value)}
+                          placeholder="0,00"
+                          className="w-full text-[12px] text-right font-bold text-[#111827] bg-transparent outline-none border-b border-transparent focus:border-[#1d4ed8]"
+                          style={{ fontFamily: 'var(--font-mono)' }}
+                        />
+                      </div>
+                      {/* Categoria */}
+                      <div>
+                        <p className="text-[9px] font-semibold text-[#9ca3af] tracking-wider uppercase mb-1">Categoria</p>
+                        <div className="relative">
+                          <select
+                            value={item.categoria}
+                            onChange={e => upd(item.id, 'categoria', e.target.value)}
+                            className="w-full text-[10px] font-semibold text-[#374151] bg-[#f4f5f7] border border-[#e8eaed] rounded-md px-1.5 py-0.5 outline-none appearance-none pr-4 focus:border-[#1d4ed8] transition-colors"
+                          >
+                            {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
+                          </select>
+                          <svg className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Subtotal */}
-            {items.length > 0 && (
-              <div className="flex justify-between items-center mt-3.5 pt-3 border-t border-[#f0f0f0]">
-                <span className="text-[11px] text-[#9ca3af] font-medium">Subtotal dos itens</span>
-                <span className="text-[13px] font-bold text-[#111827]" style={{ fontFamily: 'var(--font-mono)' }}>
-                  R$ {subtotal.toFixed(2).replace('.', ',')}
-                </span>
+                ))}
               </div>
-            )}
 
-            {/* Adicionar item */}
-            <button
-              onClick={addItem}
-              className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-[#d1d5db] text-[11px] font-semibold text-[#9ca3af] hover:border-[#1d4ed8] hover:text-[#1d4ed8] hover:bg-[#eff2ff] transition-all active:scale-[0.98]"
-            >
-              <PlusIcon />
-              Adicionar item manualmente
-            </button>
+              {/* Subtotal */}
+              {items.length > 0 && (
+                <div className="flex justify-between items-center mt-3.5 pt-3 border-t border-[#f0f0f0] md:border-[#e8eaed]">
+                  <span className="text-[11px] text-[#9ca3af] font-medium">Subtotal dos itens</span>
+                  <span className="text-[13px] font-bold text-[#111827]" style={{ fontFamily: 'var(--font-mono)' }}>
+                    R$ {subtotal.toFixed(2).replace('.', ',')}
+                  </span>
+                </div>
+              )}
+
+              {/* Adicionar item */}
+              <button
+                onClick={addItem}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-[#d1d5db] md:border-[#c0c4cb] text-[11px] font-semibold text-[#9ca3af] hover:border-[#1d4ed8] hover:text-[#1d4ed8] hover:bg-[#eff2ff] transition-all active:scale-[0.98]"
+              >
+                <PlusIcon />
+                Adicionar item manualmente
+              </button>
+
+              {/* Botão Salvar (Visível apenas no Desktop, no fim da coluna de Itens) */}
+              <div className="hidden md:block mt-auto pt-6 pb-2">
+                <button className="w-full py-3.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e40af] active:bg-[#1e3a8a] text-white text-[14px] font-bold tracking-wide transition-all active:scale-[0.98] shadow-lg shadow-[#1d4ed8]/20">
+                  Salvar Transação
+                </button>
+                <p className="text-center text-[10px] text-[#9ca3af] mt-2 tracking-wide">
+                  Todos os campos obrigatórios devem ser preenchidos
+                </p>
+              </div>
+
+            </div>
           </div>
         </div>
 
-        {/* ── FOOTER FIXO ── */}
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white/95 backdrop-blur-sm border-t border-[#e8eaed] px-4 pt-3 pb-5 z-20">
+        {/* ── FOOTER FIXO (Visível APENAS no Mobile) ── */}
+        <div className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white/95 backdrop-blur-sm border-t border-[#e8eaed] px-4 pt-3 pb-5 z-20">
           <button className="w-full py-3.5 rounded-xl bg-[#1d4ed8] hover:bg-[#1e40af] active:bg-[#1e3a8a] text-white text-[14px] font-bold tracking-wide transition-all active:scale-[0.98] shadow-lg shadow-[#1d4ed8]/20">
             Salvar Transação
           </button>

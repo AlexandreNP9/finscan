@@ -20,6 +20,9 @@ O projeto adota uma arquitetura híbrida moderna, separando a interface de usuá
 
 ## 🛠️ Stack Tecnológica e Arquitetura
 
+### Frontend
+NextJS e Bootstrap
+
 Este projeto adota uma arquitetura desacoplada (Microsserviços) para garantir alta performance no processamento de dados e fluidez na interface:
 
 **Frontend (Interface e UI):**

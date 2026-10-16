@@ -56,16 +56,22 @@ http://localhost:3000
 npx localtunnel --port 3000
 ``` 
 
-* *Alternativa mais estávelpara o celular*: fazer um ssh com o pinggy.io rodando 
+* *Alternativa mais estável para o celular*: fazer um ssh com o pinggy.io rodando 
 ```bash
 ssh -p 443 -R0:localhost:3000 a.pinggy.io
 ```
 
 ### Comandos úteis:
 
-Para visualizar os logs da API de scraping: ```docker-compose logs -f```
+Para visualizar os logs da API de scraping
+```bash
+docker-compose logs -f
+```
 
-Para derrubar a aplicação: ```docker-compose down```
+Para derrubar a aplicação: 
+```bash
+docker-compose down
+```
 
 ## 📄 Licença
 

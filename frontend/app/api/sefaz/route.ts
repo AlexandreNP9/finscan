@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 
     const html = await response.text();
     const $ = cheerio.load(html);
-    
+
     // --- 1. EXTRAÇÃO DOS ITENS ---
     const itens: any[] = [];
     $('#tabResult tr').each((i, elemento) => {
@@ -30,9 +30,19 @@ export async function POST(request: Request) {
 
     // --- 2. EXTRAÇÃO DE DADOS EXTRAS DO CABEÇALHO/RODAPÉ ---
     const valorTotalNota = $('.txtMax').text().trim();
-    
+
     // Nome do Estabelecimento (ex: SUBWAY CM 2)
     const estabelecimento = $('#u20.txtTopo').text().trim();
+
+    // Endereço
+    let endereco = '';
+    $('.txtCenter .text').each((i, el) => {
+      const texto = $(el).text();
+      if (!texto.includes('CNPJ')) {
+        // O replace(/\\s+/g, ' ') limpa aquelas dezenas de espaços em branco e quebras de linha do HTML
+        endereco = texto.replace(/\s+/g, ' ').trim();
+      }
+    });
 
     // Desconto (Procura na lista de totais a label exata)
     let desconto = '0,00';
@@ -52,11 +62,12 @@ export async function POST(request: Request) {
       if (match) emissao = match[1]; // Retorna "10/10/2026 13:52:49"
     });
 
-    return NextResponse.json({ 
-      sucesso: true, 
+    return NextResponse.json({
+      sucesso: true,
       itens,
       valorTotalNota,
       estabelecimento,
+      endereco,
       desconto,
       emissao
     });

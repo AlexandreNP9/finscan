@@ -10,29 +10,51 @@ A partir desse projeto, espera-se oferecer uma visão completa e detalhada da sa
 
 ## ✨ Principais Funcionalidades
 
-*   📷 **Leitura de QR Code:** Captura da URL da Nota Fiscal de Consumidor Eletrônica (NFC-e) diretamente pela câmera via navegador web.
-*   🕷️ **Automação e Web Scraping:** Extração de descrições, quantidades e preços diretamente da SEFAZ, executada de forma assíncrona para não travar a interface.
-*   🧠 **Categorização via IA:** Processamento de linguagem natural (LLM) para higienizar nomes de produtos abreviados (ex: `BISC RECH CHOC`) e alocá-los em categorias estruturadas.
-*   📝 **Gestão de Despesas Manuais:** Módulo complementar para inserção de contas fixas e variáveis (aluguel, água, luz, assinaturas).
-*   📈 **Dashboard Analítico:** Painel visual para cruzamento de gastos em múltiplos níveis (macro vs. micro).
+-   📷 **Leitura de QR Code:** Captura da URL da Nota Fiscal de Consumidor Eletrônica (NFC-e) diretamente pela câmera via navegador web.
+-   🕷️ **Automação e Web Scraping:** Extração de descrições, quantidades e preços diretamente da SEFAZ, executada de forma assíncrona para não travar a interface.
+-   🔄 **Fluxo de Captura Inteligente (Wizard):** Interface dividida em 3 etapas (Captura, Revisão Fiscal e Enriquecimento) para reduzir a sobrecarga cognitiva do usuário.
+-   🧠 **Categorização via IA:** Processamento de linguagem natural (LLM) para higienizar nomes de produtos abreviados (ex: `BISC RECH CHOC`) e alocá-los em categorias estruturadas.
+-   📝 **Gestão de Despesas Manuais:** Módulo complementar para inserção de contas fixas e variáveis (aluguel, água, luz, assinaturas).
+-   📈 **Dashboard Analítico:** Painel visual para cruzamento de gastos em múltiplos níveis (macro vs. micro).
 
 ---
 
 ## 🛠️ Stack Tecnológica e Arquitetura
 
 ### Frontend
-NextJS e Bootstrap
+*   Next.js 16
+*   Estilização: Tailwind CSS
+*   Leitura de QR Code: `@yudiel/react-qr-scanner`
 
 ### Backend
+*   Rotas de API: Next.js Route Handlers (`/api/sefaz`).
+*   Extração de Dados: Cheerio (Faz o parsing do HTML da SEFAZ no lado do servidor, contornando bloqueios de CORS e extraindo itens via seletores CSS específicos).
 
+### Infraestrutura e DevOps
+*   Gerenciador de Pacotes: `pnpm`
+*   Containerização: Docker e Docker Compose.
 
 ---
 
-## Como rodar frontend
-cd frontend
-docker-compose up --build -d
+## 🚀 Como rodar o frontend
 
-Acessar no localhost:3000
+```bash
+cd finscan/frontend   
+docker-compose up --build -d
+```
+
+Pode ser que precise usar o ```sudo``` no Linux
+
+### Acesse a aplicação
+> No computador, acessar no ```http://localhost:3000```
+> No celular: crie um túnel segudo rodando ```npx localtunnel --port 3000``` em um terminal paralelo e acesse o link HTTPS gerado.
+> Alternativa mais estávelpara o celular: fazer um ssh com o pinggy.io rodando ```ssh -p 443 -R0:localhost:3000 a.pinggy.io```
+
+### Comandos úteis:
+
+Para visualizar os logs da API de scraping: ```docker-compose logs -f```
+
+Para derrubar a aplicação: ```docker-compose down```
 
 ## 📄 Licença
 

@@ -4,64 +4,61 @@ import * as cheerio from 'cheerio';
 export async function POST(request: Request) {
   try {
     const { url } = await request.json();
-
-    if (!url) {
-      return NextResponse.json({ error: 'URL não fornecida' }, { status: 400 });
-    }
+    if (!url) return NextResponse.json({ error: 'URL não fornecida' }, { status: 400 });
 
     const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
     });
 
     const html = await response.text();
     const $ = cheerio.load(html);
     
+    // --- 1. EXTRAÇÃO DOS ITENS ---
     const itens: any[] = [];
-    
-    // Varre cada linha (tr) da tabela de resultados da SEFAZ-PR
     $('#tabResult tr').each((i, elemento) => {
-      // 1. Descrição e Código
       const descricao = $(elemento).find('.txtTit2').text().trim();
-      const codigoRaw = $(elemento).find('.RCod').text().trim(); // Vem como "(Código: 1000013)"
-      const codigo = codigoRaw.replace(/\D/g, ''); // Deixa apenas os números
-
-      // 2. Quantidade, Unidade e Valor Unitário
-      const qtdRaw = $(elemento).find('.Rqtd').text().trim(); // Vem como "Qtde.:1"
-      const qtd = qtdRaw.replace(/[^\d,]/g, ''); // Mantém só números e vírgula
-
-      const unRaw = $(elemento).find('.RUN').text().trim(); // Vem como "UN: UN"
-      const un = unRaw.replace('UN:', '').trim();
-
-      const vlUnitRaw = $(elemento).find('.RvlUnit').text().trim(); // Vem como "Vl. Unit.: 20,9"
-      const vlUnit = vlUnitRaw.replace(/[^\d,]/g, '');
-
-      // 3. Valor Total do Item
+      const codigo = $(elemento).find('.RCod').text().replace(/\D/g, '').trim();
+      const qtd = $(elemento).find('.Rqtd').text().replace(/[^\d,]/g, '').trim();
+      const un = $(elemento).find('.RUN').text().replace('UN:', '').trim();
+      const vlUnit = $(elemento).find('.RvlUnit').text().replace(/[^\d,]/g, '').trim();
       const vlTotal = $(elemento).find('.valor').text().trim();
 
-      // Só adiciona se tiver encontrado uma descrição válida
       if (descricao) {
-        itens.push({
-          id: Date.now() + i,
-          codigo,
-          descricao,
-          qtd,
-          un,
-          vlUnit,
-          vlTotal,
-          categoria: 'Outros' // Mantém 'Outros' para você usar a IA depois
-        });
+        itens.push({ id: Date.now() + i, codigo, descricao, qtd, un, vlUnit, vlTotal, categoria: 'Outros' });
       }
     });
 
-    // Extrai o valor final a pagar da nota
+    // --- 2. EXTRAÇÃO DE DADOS EXTRAS DO CABEÇALHO/RODAPÉ ---
     const valorTotalNota = $('.txtMax').text().trim();
+    
+    // Nome do Estabelecimento (ex: SUBWAY CM 2)
+    const estabelecimento = $('#u20.txtTopo').text().trim();
+
+    // Desconto (Procura na lista de totais a label exata)
+    let desconto = '0,00';
+    $('#linhaTotal').each((i, el) => {
+      const label = $(el).find('label').text().trim();
+      if (label.includes('Descontos R$:')) {
+        desconto = $(el).find('.totalNumb').text().trim();
+      }
+    });
+
+    // Data e Hora da Emissão (Busca na lista de informações gerais via Regex)
+    let emissao = '';
+    $('#infos li').each((i, el) => {
+      const texto = $(el).text();
+      // Procura o padrão de data e hora: Emissão: DD/MM/AAAA HH:MM:SS
+      const match = texto.match(/Emissão:\s*(\d{2}\/\d{2}\/\d{4}\s\d{2}:\d{2}:\d{2})/);
+      if (match) emissao = match[1]; // Retorna "10/10/2026 13:52:49"
+    });
 
     return NextResponse.json({ 
       sucesso: true, 
       itens,
-      valorTotalNota 
+      valorTotalNota,
+      estabelecimento,
+      desconto,
+      emissao
     });
 
   } catch (error) {

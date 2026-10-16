@@ -74,6 +74,7 @@ export default function App() {
   const [valorTotal, setValorTotal] = useState('');
   const [desconto, setDesconto] = useState('0,00');
   const [estabelecimentoNota, setEstabelecimentoNota] = useState('');
+  const [endereco, setEndereco] = useState('');
   const [dataEmissao, setDataEmissao] = useState('');
   const [horaEmissao, setHoraEmissao] = useState('');
 
@@ -200,13 +201,17 @@ export default function App() {
                       <label className={lbl}>Estabelecimento</label>
                       <input type="text" readOnly value={estabelecimentoNota} placeholder="Ex: Supermercado..." className={inp + ' bg-[#f9fafb] text-[#6b7280] pointer-events-none'} />
                     </div>
+                    <div>
+                      <label className={lbl}>Endereço</label>
+                      <input type="text" readOnly value={endereco} placeholder="Ex: Rua São José, 1000..." className={inp + ' bg-[#f9fafb] text-[#6b7280] pointer-events-none'} />
+                    </div>
                     <div className="grid grid-cols-2 gap-3.5">
                       <div>
-                        <label className={lbl}>Data</label>
+                        <label className={lbl}>Data Emissão</label>
                         <input type="date" readOnly value={dataEmissao} className={inp + ' bg-[#f9fafb] text-[#6b7280] pointer-events-none'} />
                       </div>
                       <div>
-                        <label className={lbl}>Hora</label>
+                        <label className={lbl}>Hora Emissão</label>
                         <input type="time" readOnly value={horaEmissao} className={inp + ' bg-[#f9fafb] text-[#6b7280] pointer-events-none'} />
                       </div>
                     </div>
@@ -413,6 +418,7 @@ export default function App() {
                         if (data.valorTotalNota) setValorTotal(data.valorTotalNota);
                         if (data.desconto) setDesconto(data.desconto);
                         if (data.estabelecimento) setEstabelecimentoNota(data.estabelecimento);
+                        if (data.endereco) setEndereco(data.endereco);
 
                         if (data.emissao) {
                           const [dataPart, horaPart] = data.emissao.split(' ');

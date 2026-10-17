@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       const vlTotal = $(elemento).find('.valor').text().trim();
 
       if (descricao) {
-        itens.push({ id: Date.now() + i, codigo, descricao, qtd, un, vlUnit, vlTotal, categoria: 'Outros' });
+        itens.push({ id: Date.now() + i, codigo, descricao, qtd, un, vlUnit, vlTotal, categoria: '' });
       }
     });
 

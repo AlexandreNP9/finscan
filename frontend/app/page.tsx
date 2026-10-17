@@ -81,6 +81,8 @@ export default function App() {
   const [agenteOrigem, setAgenteOrigem] = useState('');
   const [observacoes, setObservacoes] = useState('');
 
+  const [isCategorizando, setIsCategorizando] = useState(false);
+
   const addItem = () =>
     setItems(p => [...p, { id: Date.now(), codigo: '', descricao: '', qtd: '1', un: 'UN', vlUnit: '', vlTotal: '', categoria: 'Outros' }])
 
@@ -89,18 +91,53 @@ export default function App() {
   const upd = (id: number, f: keyof Item, v: string) =>
     setItems(p => p.map(i => i.id === id ? { ...i, [f]: v } : i))
 
+  const categorizarComIA = async () => {
+    setIsCategorizando(true);
+    try {
+      // Manda só o essencial para a API economizar tokens
+      const itensSimplificados = items.map(i => ({ id: i.id, descricao: i.descricao }));
+
+      const res = await fetch('/api/categorizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itens: itensSimplificados })
+      });
+
+      const data = await res.json();
+
+      if (data.sucesso) {
+        // Atualiza a lista local combinando os dados antigos com a resposta da IA
+        setItems(p => p.map(itemAntigo => {
+          const sugestao = data.resultado.find((r: any) => r.id === itemAntigo.id);
+          if (sugestao) {
+            return {
+              ...itemAntigo,
+              descricao: sugestao.descricaoLimpa, // Troca a abreviação pelo nome bonito!
+              categoria: sugestao.categoria
+            };
+          }
+          return itemAntigo;
+        }));
+      }
+    } catch (error) {
+      alert('Erro ao consultar a Inteligência Artificial.');
+    } finally {
+      setIsCategorizando(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f4f5f7] flex justify-center md:items-start md:py-10">
-      
+
       {/* ── CONTAINER PRINCIPAL (Largura restaurada para 960px no desktop) ── */}
       <div className="w-full max-w-[430px] md:max-w-[960px] bg-white md:rounded-2xl md:shadow-lg overflow-hidden flex flex-col relative min-h-screen md:min-h-0 md:h-[85vh]">
-        
+
         {/* ── HEADER & PROGRESSO ── */}
         <header className="sticky top-0 z-20 bg-white pt-4 pb-3">
           <div className="relative flex items-center justify-center px-4">
             {etapa > 1 && (
-              <button 
-                onClick={() => setEtapa(e => (e - 1) as 1|2|3)} 
+              <button
+                onClick={() => setEtapa(e => (e - 1) as 1 | 2 | 3)}
                 className="absolute left-4 w-8 h-8 flex items-center justify-center rounded-lg text-[#6b7280] hover:bg-[#f4f5f7] transition-colors"
               >
                 <BackIcon />
@@ -116,8 +153,8 @@ export default function App() {
             </div>
           </div>
           <div className="w-full bg-[#f4f5f7] h-1 mt-3">
-            <div 
-              className="bg-[#1d4ed8] h-1 transition-all duration-500 ease-out" 
+            <div
+              className="bg-[#1d4ed8] h-1 transition-all duration-500 ease-out"
               style={{ width: `${(etapa / 3) * 100}%` }}
             />
           </div>
@@ -125,7 +162,7 @@ export default function App() {
 
         {/* ── ÁREA DE CONTEÚDO SCROLLÁVEL ── */}
         <div className="flex-1 overflow-y-auto bg-[#f9fafb] md:p-6 p-4">
-          
+
           {/* ==========================================
               ETAPA 1: CAPTURA 
              ========================================== */}
@@ -138,10 +175,10 @@ export default function App() {
               <p className="text-[13px] text-[#6b7280] mb-8 leading-relaxed">
                 Escaneie o QR Code do cupom fiscal para preencher todos os dados da transação automaticamente.
               </p>
-              
+
               <div className="w-full space-y-3">
-                <button 
-                  onClick={() => setIsScanning(true)} 
+                <button
+                  onClick={() => setIsScanning(true)}
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#1d4ed8] text-white rounded-xl font-bold shadow-lg shadow-[#1d4ed8]/25 hover:bg-[#1e40af] active:scale-[0.98] transition-all"
                 >
                   <CameraIcon /> Escanear QR Code
@@ -151,7 +188,7 @@ export default function App() {
                   <span className="flex-shrink-0 mx-4 text-[#9ca3af] text-[11px] font-medium uppercase tracking-wider">ou</span>
                   <div className="flex-grow border-t border-[#e8eaed]"></div>
                 </div>
-                <button 
+                <button
                   onClick={() => setEtapa(2)}
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-white border border-[#d1d5db] text-[#374151] rounded-xl font-bold hover:bg-gray-50 active:scale-[0.98] transition-all"
                 >
@@ -173,7 +210,7 @@ export default function App() {
 
               {/* Flex no desktop: Esquerda (Geral) / Direita (Itens) */}
               <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-                
+
                 <div className="w-full md:w-[45%] space-y-4">
                   {/* Valor em Destaque */}
                   <div className="bg-[#f0f4ff] border border-[#c7d7ff] rounded-xl p-4">
@@ -259,15 +296,15 @@ export default function App() {
 
               {/* Flex no desktop: Esquerda (Financeiro) / Direita (Categorização) */}
               <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-                
+
                 <div className="w-full md:w-[45%]">
                   <div className="bg-white rounded-xl border border-[#e8eaed] p-4 space-y-3.5">
                     <div>
                       <label className={lbl}>Agente Origem (Quem pagou)</label>
                       <div className="relative">
-                        <select 
-                          className={inp + ' appearance-none pr-8'} 
-                          value={agenteOrigem} 
+                        <select
+                          className={inp + ' appearance-none pr-8'}
+                          value={agenteOrigem}
                           onChange={e => setAgenteOrigem(e.target.value)}
                         >
                           <option value="" disabled>Selecionar conta/cartão…</option>
@@ -276,7 +313,7 @@ export default function App() {
                           <option>Cartão Bradesco Visa</option>
                           <option>Dinheiro (Espécie)</option>
                         </select>
-                        <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                        <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                       </div>
                     </div>
                     <div>
@@ -299,8 +336,19 @@ export default function App() {
                       <h2 className="text-[10px] font-bold text-[#374151] tracking-widest uppercase">Categorização ({items.length})</h2>
                     </div>
 
-                    <button className="w-full flex items-center justify-center gap-2 py-2.5 mb-4 rounded-lg border border-[#7c3aed]/25 bg-[#faf5ff] text-[#7c3aed] text-[11px] font-semibold hover:bg-[#f3e8ff] hover:border-[#7c3aed]/50 transition-all active:scale-[0.98]">
-                      <SparkleIcon /> Categorizar tudo com IA
+                    <button
+                      onClick={categorizarComIA}
+                      disabled={isCategorizando}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 mb-4 rounded-lg border border-[#7c3aed]/25 bg-[#faf5ff] text-[#7c3aed] text-[11px] font-semibold hover:bg-[#f3e8ff] hover:border-[#7c3aed]/50 transition-all active:scale-[0.98] disabled:opacity-50"
+                    >
+                      {isCategorizando ? (
+                        <span className="flex items-center gap-2">
+                          <div className="w-3 h-3 border-2 border-[#7c3aed] border-t-transparent rounded-full animate-spin"></div>
+                          Processando com IA...
+                        </span>
+                      ) : (
+                        <><SparkleIcon /> Categorizar tudo com IA</>
+                      )}
                     </button>
 
                     <div className="space-y-3 overflow-y-auto pr-1 flex-1">
@@ -325,7 +373,7 @@ export default function App() {
                                 <option disabled value="Categoria">Selecionar...</option>
                                 {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
                               </select>
-                              <svg className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                              <svg className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
                             </div>
                             <button
                               onClick={() => removeItem(item.id)}
@@ -357,14 +405,14 @@ export default function App() {
         {etapa > 1 && (
           <div className="absolute md:relative bottom-0 left-0 w-full bg-white border-t border-[#e8eaed] px-4 py-3 md:px-6 md:py-4 z-10 flex justify-end">
             {etapa === 2 ? (
-              <button 
-                onClick={() => setEtapa(3)} 
+              <button
+                onClick={() => setEtapa(3)}
                 className="w-full md:w-auto md:px-12 py-3.5 rounded-xl bg-[#111827] text-white text-[14px] font-bold tracking-wide hover:bg-black active:scale-[0.98] transition-all shadow-lg"
               >
                 Avançar para Categorização
               </button>
             ) : (
-              <button 
+              <button
                 className="w-full md:w-auto md:px-12 py-3.5 rounded-xl bg-[#1d4ed8] text-white text-[14px] font-bold tracking-wide hover:bg-[#1e40af] active:scale-[0.98] transition-all shadow-lg shadow-[#1d4ed8]/20"
               >
                 Salvar Transação Definitiva
@@ -403,7 +451,7 @@ export default function App() {
                   if (result && result.length > 0) {
                     const text = result[0].rawValue;
                     setIsProcessing(true);
-                    
+
                     try {
                       const res = await fetch('/api/sefaz', {
                         method: 'POST',
@@ -446,7 +494,7 @@ export default function App() {
                 onError={(error) => console.log(error)}
               />
             )}
-            
+
             {!isProcessing && (
               <div className="absolute inset-0 pointer-events-none border-[60px] border-black/40">
                 <div className="w-full h-full border-2 border-white/50 rounded-xl relative">

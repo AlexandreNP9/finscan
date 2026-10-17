@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Scanner } from '@yudiel/react-qr-scanner';
+
+import CATEGORIAS from './data/categorias.json';
 
 // ── ÍCONES ──
 const CameraIcon = () => (
@@ -46,6 +48,21 @@ const BackIcon = () => (
   </svg>
 )
 
+const RefreshIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 2v6h-6"></path>
+    <path d="M3 12a9 9 0 1 0 2.13-5.85L21 8"></path>
+  </svg>
+)
+
+const WarningIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="12"></line>
+    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+  </svg>
+)
+
 // ── TIPAGENS E CONSTANTES ──
 interface Item {
   id: number
@@ -57,8 +74,6 @@ interface Item {
   vlTotal: string
   categoria: string
 }
-
-const CATEGORIAS = ['Bebidas', 'Alimentação', 'Higiene', 'Limpeza', 'Lazer', 'Transporte', 'Outros']
 
 const inp = 'w-full border border-[#e2e5ea] rounded-lg bg-white text-[#111827] text-sm px-3 py-2.5 outline-none transition-all focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/10 placeholder-[#9ca3af]'
 const lbl = 'block text-[10px] font-semibold text-[#6b7280] mb-1 tracking-widest uppercase'
@@ -82,49 +97,98 @@ export default function App() {
   const [observacoes, setObservacoes] = useState('');
 
   const [isCategorizando, setIsCategorizando] = useState(false);
-
-  const addItem = () =>
-    setItems(p => [...p, { id: Date.now(), codigo: '', descricao: '', qtd: '1', un: 'UN', vlUnit: '', vlTotal: '', categoria: 'Outros' }])
-
-  const removeItem = (id: number) => setItems(p => p.filter(i => i.id !== id))
-
-  const upd = (id: number, f: keyof Item, v: string) =>
-    setItems(p => p.map(i => i.id === id ? { ...i, [f]: v } : i))
+  const [mensagemIA, setMensagemIA] = useState('Processando com IA...');
+  const [tempoIA, setTempoIA] = useState(0); // <-- Novo estado
+  const [statusIA, setStatusIA] = useState<'idle' | 'sucesso' | 'erro'>('idle');
+  const [mensagemStatus, setMensagemStatus] = useState('');
 
   const categorizarComIA = async () => {
     setIsCategorizando(true);
+    setStatusIA('idle');
+    setMensagemIA('Conectando à IA...');
+
+    const tempoInicio = Date.now();
+
+    // FAIL FAST: Aborta a requisição se demorar mais de 35 segundos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+    const timer1 = setTimeout(() => setMensagemIA('Analisando os itens da nota...'), 3000);
+    const timer2 = setTimeout(() => setMensagemIA('Cruzando dados com as categorias...'), 7000);
+    const timer3 = setTimeout(() => setMensagemIA('Ainda processando (alta demanda)...'), 12000);
+
     try {
-      // Manda só o essencial para a API economizar tokens
       const itensSimplificados = items.map(i => ({ id: i.id, descricao: i.descricao }));
 
       const res = await fetch('/api/categorizar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itens: itensSimplificados })
+        body: JSON.stringify({ itens: itensSimplificados }),
+        signal: controller.signal // Conecta o limite de tempo aqui
       });
+
+      if (!res.ok) throw new Error('Erro na API');
 
       const data = await res.json();
 
       if (data.sucesso) {
-        // Atualiza a lista local combinando os dados antigos com a resposta da IA
         setItems(p => p.map(itemAntigo => {
           const sugestao = data.resultado.find((r: any) => r.id === itemAntigo.id);
           if (sugestao) {
             return {
               ...itemAntigo,
-              descricao: sugestao.descricaoLimpa, // Troca a abreviação pelo nome bonito!
+              descricao: sugestao.descricaoLimpa,
               categoria: sugestao.categoria
             };
           }
           return itemAntigo;
         }));
+
+        // Calcula o tempo exato que levou
+        const segundosDecorridos = Math.floor((Date.now() - tempoInicio) / 1000);
+        setStatusIA('sucesso');
+        setMensagemStatus(`Concluído em ${segundosDecorridos}s`);
       }
-    } catch (error) {
-      alert('Erro ao consultar a Inteligência Artificial.');
+    } catch (error: any) {
+      setStatusIA('erro');
+      if (error.name === 'AbortError') {
+        setMensagemStatus('Tempo limite de 35s excedido. Tente novamente.');
+      } else {
+        setMensagemStatus('Alta demanda na IA. Não foi possível categorizar. Toque aqui para tentar novamente.');
+      }
     } finally {
+      clearTimeout(timeoutId);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
       setIsCategorizando(false);
+      setMensagemIA('Processando com IA...');
     }
   };
+
+
+  // <-- Novo Bloco: O Relógio
+  useEffect(() => {
+    let intervalo: NodeJS.Timeout;
+    if (isCategorizando) {
+      // Se estiver carregando, adiciona +1 a cada segundo
+      intervalo = setInterval(() => {
+        setTempoIA((segundosAtual) => segundosAtual + 1);
+      }, 1000);
+    } else {
+      // Se terminou, zera o cronômetro
+      setTempoIA(0);
+    }
+    return () => clearInterval(intervalo); // Limpeza de segurança
+  }, [isCategorizando]);
+
+  const addItem = () =>
+    setItems(p => [...p, { id: Date.now(), codigo: '', descricao: '', qtd: '1', un: 'UN', vlUnit: '', vlTotal: '', categoria: '' }])
+
+  const removeItem = (id: number) => setItems(p => p.filter(i => i.id !== id))
+
+  const upd = (id: number, f: keyof Item, v: string) =>
+    setItems(p => p.map(i => i.id === id ? { ...i, [f]: v } : i))
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] flex justify-center md:items-start md:py-10">
@@ -339,13 +403,24 @@ export default function App() {
                     <button
                       onClick={categorizarComIA}
                       disabled={isCategorizando}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 mb-4 rounded-lg border border-[#7c3aed]/25 bg-[#faf5ff] text-[#7c3aed] text-[11px] font-semibold hover:bg-[#f3e8ff] hover:border-[#7c3aed]/50 transition-all active:scale-[0.98] disabled:opacity-50"
+                      className={`w-full flex items-center justify-center gap-2 py-2.5 mb-4 rounded-lg border text-[11px] font-semibold transition-all active:scale-[0.98] disabled:opacity-50 ${isCategorizando ? 'border-[#7c3aed]/25 bg-[#faf5ff] text-[#7c3aed]' :
+                        statusIA === 'sucesso' ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-400' :
+                          statusIA === 'erro' ? 'border-red-300 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-400' :
+                            'border-[#7c3aed]/25 bg-[#faf5ff] text-[#7c3aed] hover:bg-[#f3e8ff] hover:border-[#7c3aed]/50'
+                        }`}
                     >
                       {isCategorizando ? (
                         <span className="flex items-center gap-2">
-                          <div className="w-3 h-3 border-2 border-[#7c3aed] border-t-transparent rounded-full animate-spin"></div>
-                          Processando com IA...
+                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                          {mensagemIA}
+                          <span className="font-mono bg-current/10 px-1.5 py-0.5 rounded text-[10px] ml-1">
+                            {tempoIA}s
+                          </span>
                         </span>
+                      ) : statusIA === 'sucesso' ? (
+                        <><RefreshIcon /> Recategorizar IA ({mensagemStatus})</>
+                      ) : statusIA === 'erro' ? (
+                        <><WarningIcon /> {mensagemStatus}</>
                       ) : (
                         <><SparkleIcon /> Categorizar tudo com IA</>
                       )}
@@ -368,9 +443,10 @@ export default function App() {
                               <select
                                 value={item.categoria}
                                 onChange={e => upd(item.id, 'categoria', e.target.value)}
-                                className="w-full text-[11px] md:text-[12px] font-medium text-[#374151] bg-[#f4f5f7] border border-[#e8eaed] rounded-md px-2 py-1.5 outline-none appearance-none pr-6 focus:border-[#1d4ed8]"
+                                className={`w-full text-[11px] md:text-[12px] font-medium bg-[#f4f5f7] border rounded-md px-2 py-1.5 outline-none appearance-none pr-6 focus:border-[#1d4ed8] transition-colors ${item.categoria === '' ? 'text-orange-600 border-orange-300 bg-orange-50' : 'text-[#374151] border-[#e8eaed]'
+                                  }`}
                               >
-                                <option disabled value="Categoria">Selecionar...</option>
+                                <option disabled value="">Sem Categoria</option>
                                 {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
                               </select>
                               <svg className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>

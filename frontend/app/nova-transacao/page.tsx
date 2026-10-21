@@ -5,14 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Scanner } from '@yudiel/react-qr-scanner';
 
 import { Item } from '../../types';
-import { CameraIcon, KeyboardIcon, BackIcon } from '../../components/icons';
+import { CameraIcon, KeyboardIcon, BackIcon, CodeIcon } from '../../components/icons';
 
 const inp = 'w-full border border-[#e2e5ea] rounded-lg bg-white text-[#111827] text-sm px-3 py-2.5 outline-none transition-all focus:border-[#1d4ed8] placeholder-[#9ca3af]';
 const lbl = 'block text-[10px] font-semibold text-[#6b7280] mb-1 tracking-widest uppercase';
-
-const CodeIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-);
 
 export default function NovaTransacao() {
   const router = useRouter();

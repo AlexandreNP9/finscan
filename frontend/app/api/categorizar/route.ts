@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import categoriasCadastradas from '../../data/categorias.json';
+import categoriasCadastradas from '../../../data/categorias.json';
 
 // Inicializa o SDK com a sua chave do .env
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
         // Inicialização otimizada para velocidade e precisão
         const model = genAI.getGenerativeModel({
-            model: 'gemini-3.8-flash',
+            model: 'gemini-3.1-flash-lite',
             generationConfig: {
                 temperature: 0.1, // Quase zero criatividade, foco total em classificação lógica rápida
                 responseMimeType: "application/json", // Força a engine a cuspir JSON nativo sem pensar

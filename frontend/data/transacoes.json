@@ -1,5 +1,74 @@
 [
   {
+    "id": 1792554567399,
+    "chaveAcesso": "41261079430682025036650530003258811787126100",
+    "valorTotal": "33,90",
+    "desconto": "0,00",
+    "estabelecimento": "FARMACIA E DROGARIA NISSEI SA",
+    "dataEmissao": "2026-10-18",
+    "horaEmissao": "00:31",
+    "agenteOrigem": "Dinheiro (Espécie)",
+    "items": [
+      {
+        "id": 1792554559574,
+        "descricao": "DES BOZZANO ANTIBAC FRES 200ML",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "13,9",
+        "vlTotal": "13,90",
+        "categoria": "Higiene Pessoal"
+      },
+      {
+        "id": 1792554559576,
+        "descricao": "PICOLE LAKA CHOC BRANC OREO 68",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "18,9",
+        "vlTotal": "18,90",
+        "categoria": "Lanches e Doces"
+      },
+      {
+        "id": 1792554559577,
+        "descricao": "CHICLETES MENTOS 3L SPEARMINT",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "4",
+        "vlTotal": "4,00",
+        "categoria": "Lanches e Doces"
+      }
+    ]
+  },
+  {
+    "id": 1792554471599,
+    "chaveAcesso": "41261082654989000111650150001392551027835617",
+    "valorTotal": "17,64",
+    "desconto": "0,00",
+    "estabelecimento": "SANTOSMATA LTDA.",
+    "dataEmissao": "2026-10-20",
+    "horaEmissao": "07:48",
+    "agenteOrigem": "Dinheiro (Espécie)",
+    "items": [
+      {
+        "id": 1792554463282,
+        "descricao": "SUCO PRATS 300ML LAR ACEROLA",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "6,98",
+        "vlTotal": "6,98",
+        "categoria": "Bebidas Não Alcoólicas"
+      },
+      {
+        "id": 1792554463283,
+        "descricao": "ILHA SALGADOS",
+        "qtd": "0,1481",
+        "un": "KG",
+        "vlUnit": "72",
+        "vlTotal": "10,66",
+        "categoria": "Lanches e Doces"
+      }
+    ]
+  },
+  {
     "id": 1792552388669,
     "chaveAcesso": "",
     "valorTotal": "35,46",

@@ -34,6 +34,16 @@ export default function App() {
   const [statusIA, setStatusIA] = useState<'idle' | 'sucesso' | 'erro'>('idle');
   const [mensagemStatus, setMensagemStatus] = useState('');
 
+  const [listaAgentes, setListaAgentes] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch('/api/agentes')
+      .then(res => res.json())
+      .then(data => {
+        if (data.sucesso) setListaAgentes(data.agentes);
+      });
+  }, []);
+
   const categorizarComIA = async () => {
     setIsCategorizando(true);
     setStatusIA('idle');
@@ -304,10 +314,7 @@ export default function App() {
                           onChange={e => setAgenteOrigem(e.target.value)}
                         >
                           <option value="" disabled>Selecionar conta/cartão…</option>
-                          <option>Nubank – Conta Corrente</option>
-                          <option>Itaú – Conta Poupança</option>
-                          <option>Cartão Bradesco Visa</option>
-                          <option>Dinheiro (Espécie)</option>
+                          {listaAgentes.map(ag => <option key={ag}>{ag}</option>)}
                         </select>
                         <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                       </div>

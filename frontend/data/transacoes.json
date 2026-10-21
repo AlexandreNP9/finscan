@@ -1,5 +1,57 @@
 [
   {
+    "id": 1792552388669,
+    "chaveAcesso": "",
+    "valorTotal": "35,46",
+    "desconto": "0,00",
+    "estabelecimento": "Cia Parana De Alimentos S/A",
+    "dataEmissao": "2026-10-20",
+    "horaEmissao": "20:27",
+    "agenteOrigem": "Dinheiro (Espécie)",
+    "items": [
+      {
+        "id": 1792552381833,
+        "codigo": "172812",
+        "descricao": "Ref Ccola 1lt",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "7,49",
+        "vlTotal": "7,49",
+        "categoria": "Bebidas Não Alcoólicas"
+      },
+      {
+        "id": 1792552381835,
+        "codigo": "1283901",
+        "descricao": "Beb Ener Mon 4",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "8,99",
+        "vlTotal": "8,99",
+        "categoria": "Bebidas Não Alcoólicas"
+      },
+      {
+        "id": 1792552381836,
+        "codigo": "1297988",
+        "descricao": "Beb Ener Mon 4",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "8,99",
+        "vlTotal": "8,99",
+        "categoria": "Bebidas Não Alcoólicas"
+      },
+      {
+        "id": 1792552381838,
+        "codigo": "1287443",
+        "descricao": "Choc Nestle 90",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "9,99",
+        "vlTotal": "9,99",
+        "categoria": "Lanches e Doces"
+      }
+    ]
+  },
+  {
     "id": 1792551930218,
     "chaveAcesso": "",
     "valorTotal": "166,99",

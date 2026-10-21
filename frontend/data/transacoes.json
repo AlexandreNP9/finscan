@@ -1,0 +1,194 @@
+[
+  {
+    "id": 1792551930218,
+    "chaveAcesso": "",
+    "valorTotal": "166,99",
+    "desconto": "0,00",
+    "estabelecimento": "IRMAOS MUFFATO E CIA LTDA",
+    "dataEmissao": "2026-10-03",
+    "horaEmissao": "21:08",
+    "agenteOrigem": "Nubank - Conta Corrente",
+    "items": [
+      {
+        "id": 1792551918187,
+        "codigo": "214083",
+        "descricao": "IOGURTE BATAVO 450G",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "14,09",
+        "vlTotal": "14,09",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918188,
+        "codigo": "279437",
+        "descricao": "UVA BRAVIS 500G",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "8,99",
+        "vlTotal": "8,99",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918189,
+        "codigo": "313410",
+        "descricao": "ENERG MONSTER 473ML",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "8,49",
+        "vlTotal": "8,49",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918190,
+        "codigo": "221613",
+        "descricao": "ENERG MONST 473ML",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "8,49",
+        "vlTotal": "8,49",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918192,
+        "codigo": "309959",
+        "descricao": "ENERG MONSTER 473ML",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "8,49",
+        "vlTotal": "8,49",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918193,
+        "codigo": "288939",
+        "descricao": "CHOC NESTLE TBL 80G",
+        "qtd": "2",
+        "un": "Un",
+        "vlUnit": "7,79",
+        "vlTotal": "15,58",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918194,
+        "codigo": "314012",
+        "descricao": "CHOC MILKA 90G",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "14,95",
+        "vlTotal": "14,95",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918196,
+        "codigo": "290005",
+        "descricao": "MACA CANTU 1KG",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "5,99",
+        "vlTotal": "5,99",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918197,
+        "codigo": "28769",
+        "descricao": "CHOC BATON BCO 16G",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "2,39",
+        "vlTotal": "2,39",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918198,
+        "codigo": "276385",
+        "descricao": "IOG FRIMESA 165G",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "2,89",
+        "vlTotal": "2,89",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918200,
+        "codigo": "135787",
+        "descricao": "REQ BATAVO 200G",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "8,99",
+        "vlTotal": "8,99",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918201,
+        "codigo": "269543",
+        "descricao": "PRESUNTO FRIMES 200G",
+        "qtd": "2",
+        "un": "Un",
+        "vlUnit": "8,59",
+        "vlTotal": "17,18",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918202,
+        "codigo": "290077",
+        "descricao": "QUEIJO BATAVO 500G",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "28,9",
+        "vlTotal": "28,90",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918203,
+        "codigo": "3408",
+        "descricao": "CENOURA KG",
+        "qtd": "0,64",
+        "un": "Kg",
+        "vlUnit": "3,984375",
+        "vlTotal": "2,55",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918205,
+        "codigo": "959",
+        "descricao": "LIMAO kg",
+        "qtd": "1,055",
+        "un": "Kg",
+        "vlUnit": "9,990521",
+        "vlTotal": "10,54",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918206,
+        "codigo": "3236",
+        "descricao": "BETERRABA KG",
+        "qtd": "0,765",
+        "un": "Kg",
+        "vlUnit": "2,993464",
+        "vlTotal": "2,29",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918207,
+        "codigo": "3461",
+        "descricao": "GENGIBRE KG",
+        "qtd": "0,11",
+        "un": "Kg",
+        "vlUnit": "20",
+        "vlTotal": "2,20",
+        "categoria": ""
+      },
+      {
+        "id": 1792551918208,
+        "codigo": "39423",
+        "descricao": "LEITE VIDAT SAQ 1L",
+        "qtd": "1",
+        "un": "Un",
+        "vlUnit": "5,99",
+        "vlTotal": "5,99",
+        "categoria": ""
+      }
+    ]
+  }
+]

@@ -17,7 +17,7 @@
         "un": "Un",
         "vlUnit": "14,09",
         "vlTotal": "14,09",
-        "categoria": ""
+        "categoria": "Frios e Laticínios"
       },
       {
         "id": 1792551918188,
@@ -27,7 +27,7 @@
         "un": "Un",
         "vlUnit": "8,99",
         "vlTotal": "8,99",
-        "categoria": ""
+        "categoria": "Hortifruti"
       },
       {
         "id": 1792551918189,
@@ -37,7 +37,7 @@
         "un": "Un",
         "vlUnit": "8,49",
         "vlTotal": "8,49",
-        "categoria": ""
+        "categoria": "Bebidas Não Alcoólicas"
       },
       {
         "id": 1792551918190,
@@ -47,7 +47,7 @@
         "un": "Un",
         "vlUnit": "8,49",
         "vlTotal": "8,49",
-        "categoria": ""
+        "categoria": "Bebidas Não Alcoólicas"
       },
       {
         "id": 1792551918192,
@@ -57,7 +57,7 @@
         "un": "Un",
         "vlUnit": "8,49",
         "vlTotal": "8,49",
-        "categoria": ""
+        "categoria": "Bebidas Não Alcoólicas"
       },
       {
         "id": 1792551918193,
@@ -67,7 +67,7 @@
         "un": "Un",
         "vlUnit": "7,79",
         "vlTotal": "15,58",
-        "categoria": ""
+        "categoria": "Lanches e Doces"
       },
       {
         "id": 1792551918194,
@@ -77,7 +77,7 @@
         "un": "Un",
         "vlUnit": "14,95",
         "vlTotal": "14,95",
-        "categoria": ""
+        "categoria": "Lanches e Doces"
       },
       {
         "id": 1792551918196,
@@ -87,7 +87,7 @@
         "un": "Un",
         "vlUnit": "5,99",
         "vlTotal": "5,99",
-        "categoria": ""
+        "categoria": "Hortifruti"
       },
       {
         "id": 1792551918197,
@@ -97,7 +97,7 @@
         "un": "Un",
         "vlUnit": "2,39",
         "vlTotal": "2,39",
-        "categoria": ""
+        "categoria": "Lanches e Doces"
       },
       {
         "id": 1792551918198,
@@ -107,7 +107,7 @@
         "un": "Un",
         "vlUnit": "2,89",
         "vlTotal": "2,89",
-        "categoria": ""
+        "categoria": "Frios e Laticínios"
       },
       {
         "id": 1792551918200,
@@ -117,7 +117,7 @@
         "un": "Un",
         "vlUnit": "8,99",
         "vlTotal": "8,99",
-        "categoria": ""
+        "categoria": "Frios e Laticínios"
       },
       {
         "id": 1792551918201,
@@ -127,7 +127,7 @@
         "un": "Un",
         "vlUnit": "8,59",
         "vlTotal": "17,18",
-        "categoria": ""
+        "categoria": "Frios e Laticínios"
       },
       {
         "id": 1792551918202,
@@ -137,7 +137,7 @@
         "un": "Un",
         "vlUnit": "28,9",
         "vlTotal": "28,90",
-        "categoria": ""
+        "categoria": "Frios e Laticínios"
       },
       {
         "id": 1792551918203,
@@ -147,7 +147,7 @@
         "un": "Kg",
         "vlUnit": "3,984375",
         "vlTotal": "2,55",
-        "categoria": ""
+        "categoria": "Hortifruti"
       },
       {
         "id": 1792551918205,
@@ -157,7 +157,7 @@
         "un": "Kg",
         "vlUnit": "9,990521",
         "vlTotal": "10,54",
-        "categoria": ""
+        "categoria": "Hortifruti"
       },
       {
         "id": 1792551918206,
@@ -167,7 +167,7 @@
         "un": "Kg",
         "vlUnit": "2,993464",
         "vlTotal": "2,29",
-        "categoria": ""
+        "categoria": "Hortifruti"
       },
       {
         "id": 1792551918207,
@@ -177,7 +177,7 @@
         "un": "Kg",
         "vlUnit": "20",
         "vlTotal": "2,20",
-        "categoria": ""
+        "categoria": "Hortifruti"
       },
       {
         "id": 1792551918208,
@@ -187,7 +187,7 @@
         "un": "Un",
         "vlUnit": "5,99",
         "vlTotal": "5,99",
-        "categoria": ""
+        "categoria": "Frios e Laticínios"
       }
     ]
   }

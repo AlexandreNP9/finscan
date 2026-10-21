@@ -32,3 +32,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ sucesso: false }, { status: 500 });
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const transacaoAtualizada = await request.json();
+    const fileContents = fs.readFileSync(dataFilePath, 'utf8');
+    let transacoes = JSON.parse(fileContents);
+
+    // Encontra a transação pelo ID e substitui pelos dados novos
+    transacoes = transacoes.map((t: any) => 
+      t.id === transacaoAtualizada.id ? transacaoAtualizada : t
+    );
+
+    fs.writeFileSync(dataFilePath, JSON.stringify(transacoes, null, 2), 'utf8');
+    return NextResponse.json({ sucesso: true });
+  } catch (error) {
+    return NextResponse.json({ sucesso: false, erro: 'Erro ao atualizar' }, { status: 500 });
+  }
+}

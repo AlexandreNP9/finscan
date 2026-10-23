@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
+import { headers } from 'next/headers'; // <-- 1. Adicione a importação
 
 export async function GET() {
+  await headers(); // <-- 2. Adicione esta linha
   try {
     let agentes = await prisma.agente.findMany({
       orderBy: { nome: 'asc' }

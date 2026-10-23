@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
+import { headers } from 'next/headers'; // <-- 1. Adicione a importação
 
 export async function POST(request: Request) {
   try {
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  await headers(); // <-- 2. Adicione esta linha no início do GET
   try {
     // Busca todas as transações, trazendo junto os itens e o agente
     const transacoes = await prisma.transacao.findMany({

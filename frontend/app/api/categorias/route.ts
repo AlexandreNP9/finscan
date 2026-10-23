@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../lib/prisma';
+import { headers } from 'next/headers'; // <-- 1. Adicione a importação
 
 export async function GET() {
+  await headers(); // <-- 2. Adicione esta linha para bloquear o build-time
   try {
     // Busca todas as categorias no banco de dados, ordenadas por nome
     const categorias = await prisma.categoria.findMany({

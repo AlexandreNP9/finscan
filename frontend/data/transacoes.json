@@ -1,5 +1,37 @@
 [
   {
+    "id": 1792725370796,
+    "chaveAcesso": "",
+    "valorTotal": "31,81",
+    "desconto": "0,00",
+    "estabelecimento": "Cia Parana De Alimentos S/A",
+    "dataEmissao": "2026-10-22",
+    "horaEmissao": "20:47",
+    "agenteOrigem": "Cartão Nubank Virtual",
+    "items": [
+      {
+        "id": 1792725362911,
+        "codigo": "316091",
+        "descricao": "Pizza Especial",
+        "qtd": "0,308",
+        "un": "KG",
+        "vlUnit": "44,9",
+        "vlTotal": "13,83",
+        "categoria": "Congelados"
+      },
+      {
+        "id": 1792725362912,
+        "codigo": "1035355",
+        "descricao": "Choc Milka 92g",
+        "qtd": "1",
+        "un": "UN",
+        "vlUnit": "17,98",
+        "vlTotal": "17,98",
+        "categoria": "Lanches e Doces"
+      }
+    ]
+  },
+  {
     "id": 1792554567399,
     "chaveAcesso": "41261079430682025036650530003258811787126100",
     "valorTotal": "33,90",

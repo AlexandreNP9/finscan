@@ -1,28 +1,25 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const dataFilePath = path.join(process.cwd(), 'data', 'agentes.json');
+import { prisma } from '../../../lib/prisma';
 
 export async function GET() {
   try {
-    if (!fs.existsSync(dataFilePath)) {
-      fs.writeFileSync(dataFilePath, JSON.stringify([]), 'utf8');
-    }
-    const fileContents = fs.readFileSync(dataFilePath, 'utf8');
-    const agentes = JSON.parse(fileContents);
-    return NextResponse.json({ sucesso: true, agentes });
-  } catch (error) {
-    return NextResponse.json({ sucesso: false, erro: 'Erro ao ler agentes' }, { status: 500 });
-  }
-}
+    let agentes = await prisma.agente.findMany({
+      orderBy: { nome: 'asc' }
+    });
 
-export async function POST(request: Request) {
-  try {
-    const { agentes } = await request.json();
-    fs.writeFileSync(dataFilePath, JSON.stringify(agentes, null, 2), 'utf8');
-    return NextResponse.json({ sucesso: true });
+    // Seed automático: se não houver agentes, cria opções padrão
+    if (agentes.length === 0) {
+      await prisma.agente.createMany({
+        data: [{ nome: 'Dinheiro' }, { nome: 'Cartão de Débito' }, { nome: 'Nubank' }]
+      });
+      agentes = await prisma.agente.findMany({ orderBy: { nome: 'asc' } });
+    }
+
+    // O frontend atual espera um array de strings com os nomes
+    const nomesAgentes = agentes.map(agente => agente.nome);
+    
+    return NextResponse.json({ sucesso: true, agentes: nomesAgentes });
   } catch (error) {
-    return NextResponse.json({ sucesso: false, erro: 'Erro ao salvar agentes' }, { status: 500 });
+    return NextResponse.json({ sucesso: false, erro: 'Erro ao buscar agentes no banco de dados.' }, { status: 500 });
   }
 }

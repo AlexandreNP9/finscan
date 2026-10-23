@@ -16,6 +16,13 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # Copia todo o resto do código para o contêiner
 COPY . .
 
+# Adicione esta linha para gerar o Prisma Client dentro do Docker:
+RUN npx prisma generate
+
+RUN pnpm build
+EXPOSE 3000
+CMD ["pnpm", "start"]
+
 # Roda o build de produção do Next.js
 RUN pnpm build
 

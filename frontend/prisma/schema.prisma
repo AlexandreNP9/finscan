@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Agente {
+  id         String      @id @default(uuid())
+  nome       String
+  transacoes Transacao[]
+  criadoEm   DateTime    @default(now())
+}
+
+model Categoria {
+  id       String   @id @default(uuid())
+  nome     String   @unique
+  cor      String
+  itens    Item[]
+  criadoEm DateTime @default(now())
+}
+
+model Transacao {
+  id                       String   @id @default(uuid())
+  titulo                   String
+  valorPago                Decimal  @db.Decimal(10, 2)
+  dataEmissao              DateTime
+  
+  // Relacionamento Obrigatório
+  agenteId                 String
+  agente                   Agente   @relation(fields: [agenteId], references: [id])
+  
+  // Campos Fiscais (Opcionais)
+  chaveAcesso              String?  @unique
+  estabelecimentoNome      String?
+  estabelecimentoCnpj      String?
+  estabelecimentoEndereco  String?
+  numeroNota               String?
+  serieNota                String?
+  protocoloAutorizacao     String?
+  valorBruto               Decimal? @db.Decimal(10, 2)
+  valorDesconto            Decimal? @db.Decimal(10, 2)
+  formaPagamentoOriginal   String?
+  
+  itens                    Item[]
+  criadoEm                 DateTime @default(now())
+}
+
+model Item {
+  id             String    @id @default(uuid())
+  descricao      String
+  quantidade     Decimal   @db.Decimal(10, 4)
+  valorUnitario  Decimal   @db.Decimal(10, 2)
+  valorTotal     Decimal   @db.Decimal(10, 2)
+  
+  codigoProduto  String?
+  unidadeMedida  String?
+  
+  // Relacionamentos
+  transacaoId    String
+  transacao      Transacao @relation(fields: [transacaoId], references: [id], onDelete: Cascade)
+  
+  categoriaId    String?
+  categoria      Categoria? @relation(fields: [categoriaId], references: [id])
+}

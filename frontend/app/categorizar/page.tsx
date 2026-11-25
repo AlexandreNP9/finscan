@@ -74,8 +74,8 @@ export default function CategorizarProdutos() {
         signal: controller.signal
       });
 
-      if (!res.ok) throw new Error('Erro na API');
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.erro || 'Erro na Inteligência Artificial.');
 
       if (data.sucesso) {
         // Atualiza os itens da transação ativa com as respostas da IA
@@ -92,7 +92,7 @@ export default function CategorizarProdutos() {
       }
     } catch (error: any) {
       setStatusIA('erro');
-      setMensagemStatus(error.name === 'AbortError' ? 'Tempo limite (35s) excedido.' : 'Erro na Inteligência Artificial.');
+      setMensagemStatus(error.name === 'AbortError' ? 'Tempo limite (35s) excedido.' : (error.message || 'Erro na Inteligência Artificial.'));
     } finally {
       clearTimeout(timeoutId); clearTimeout(t1); clearTimeout(t2);
       setIsCategorizando(false);

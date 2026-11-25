@@ -1,26 +1,23 @@
-# Usa a versão oficial do Node (Alpine é mais leve)
-FROM node:20-alpine
+FROM node:22-alpine
 
-# Define o diretório de trabalho dentro do contêiner
 WORKDIR /app
 
-# Instala o pnpm globalmente
-RUN npm install -g pnpm
+# Usa a versão do pnpm fixada em "packageManager" no package.json.
+RUN corepack enable
 
-# Copia os arquivos de dependência primeiro (melhora o cache do Docker)
-COPY package.json pnpm-lock.yaml ./
+# Copia os arquivos de dependência primeiro (melhora o cache do Docker).
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Instala as dependências
+# --ignore-scripts: nenhuma dependência precisa de build nativo (bcryptjs é JS puro).
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# Copia todo o resto do código para o contêiner
+# Copia o restante do código (.env e afins ficam de fora via .dockerignore:
+# as variáveis chegam pelo docker-compose em tempo de execução).
 COPY . .
 
-# Roda o build de produção do Next.js
 RUN pnpm build
 
-# Expõe a porta que o Next.js usa
 EXPOSE 3000
 
-# Aplica as migrations pendentes do banco e inicia o servidor de produção
+# Aplica as migrations pendentes do banco e inicia o servidor de produção.
 CMD ["sh", "-c", "pnpm db:migrate && pnpm start"]

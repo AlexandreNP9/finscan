@@ -3,3 +3,6 @@ node_modules
 .git
 .DS_Store
 README.md
+# Segredos locais nunca entram na imagem; as variáveis vêm do docker-compose.
+.env*
+!.env.example

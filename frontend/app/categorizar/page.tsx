@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { buscarApi } from '../../lib/cliente';
 import { BackIcon, SparkleIcon, RefreshIcon, WarningIcon } from '../../components/icons';
-import CATEGORIAS from '../../data/categorias.json';
 import { Item } from '../../types';
 
 export default function CategorizarProdutos() {
   const [transacoes, setTransacoes] = useState<any[]>([]);
   const [transacaoAtiva, setTransacaoAtiva] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [categorias, setCategorias] = useState<string[]>([]);
 
   // Estados da IA (Aqueles que já tínhamos lapidado!)
   const [isCategorizando, setIsCategorizando] = useState(false);
@@ -36,8 +36,18 @@ export default function CategorizarProdutos() {
       });
   };
 
+  // Categorias do usuário logado (as mesmas que a IA recebe no prompt)
+  const carregarCategorias = () => {
+    buscarApi('/api/categorias')
+      .then(res => res.json())
+      .then(data => {
+        if (data.sucesso) setCategorias(data.categorias);
+      });
+  };
+
   useEffect(() => {
     carregarTransacoes();
+    carregarCategorias();
   }, []);
 
   // O Relógio da IA
@@ -246,7 +256,7 @@ export default function CategorizarProdutos() {
                           }`}
                         >
                           <option disabled value="">Sem Categoria (Pendência)</option>
-                          {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                          {categorias.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                         <svg className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af] pointer-events-none" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
                       </div>

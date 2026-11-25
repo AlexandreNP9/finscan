@@ -1,7 +1,7 @@
 // Vincula ao usuário os dados sem dono (anteriores à autenticação): categorias, agentes e
 // transações. Categorias/agentes com nome que o usuário já tem são mesclados nos dele.
 // Uso: pnpm db:atribuir <email>   (a conta precisa existir; crie em /cadastro)
-// No Docker: docker compose exec finance-web pnpm db:atribuir <email>
+// No Docker: docker compose exec app pnpm db:atribuir <email>
 import './carregar-env';
 import { atribuirDadosSemDono, buscarUsuarioPorEmail } from '../lib/db/repositorio';
 

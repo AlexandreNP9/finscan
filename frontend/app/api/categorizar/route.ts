@@ -5,9 +5,6 @@ import { listarNomes } from '../../../lib/db/repositorio';
 import { respostaDeErro } from '../../../lib/api';
 import { exigirUsuario } from '../../../lib/auth';
 
-// Inicializa o SDK com a sua chave do .env
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 export async function POST(request: Request) {
     let usuarioId: number;
     try {
@@ -15,6 +12,16 @@ export async function POST(request: Request) {
     } catch (error) {
         return respostaDeErro(error, 'Erro ao verificar sessão');
     }
+
+    // Sem chave o restante do app funciona; só a categorização por IA fica indisponível.
+    const chaveGemini = process.env.GEMINI_API_KEY?.trim();
+    if (!chaveGemini) {
+        return NextResponse.json(
+            { sucesso: false, erro: 'Categorização por IA indisponível: defina GEMINI_API_KEY no .env e reinicie o app.' },
+            { status: 503 },
+        );
+    }
+    const genAI = new GoogleGenerativeAI(chaveGemini);
 
     try {
         const { itens } = await request.json();

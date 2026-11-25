@@ -14,7 +14,7 @@ The whole app lives in `frontend/` (a single Next.js app serving both UI and API
 
 ## Commands
 
-Run from `frontend/` (package manager is **pnpm**):
+Run from `frontend/` (package manager is **pnpm**); the `docker compose` commands run from the repo root, where `docker-compose.yml` lives:
 
 ```bash
 pnpm install
@@ -26,16 +26,17 @@ pnpm db:migrate   # apply pending migrations (also run automatically by the Dock
 pnpm db:seed [email]   # one-time import of data/*.json into Postgres (skips transactions if table non-empty); with email, imported transactions belong to that user
 pnpm db:atribuir <email>  # assign categories, agents and transactions with no owner (pre-auth data) to an existing user
 pnpm db:studio    # Drizzle Studio
-docker-compose up --build -d   # app + Postgres (db exposed on host port 5433)
-docker-compose up -d db        # only Postgres, for running `pnpm dev` locally
-docker-compose logs -f         # view scraping/API logs
+docker compose up --build -d   # (repo root) app + Postgres (db exposed on host port 5433)
+docker compose up -d db        # (repo root) only Postgres, for running `pnpm dev` locally
+docker compose logs -f app     # (repo root) view scraping/API logs
+docker compose exec app pnpm db:seed <email>   # run scripts inside the app container
 ```
 
 There is no test suite.
 
 To test on a phone (camera QR scanning needs HTTPS), tunnel port 3000: `npx localtunnel --port 3000` or `ssh -p 443 -R0:localhost:3000 a.pinggy.io`.
 
-Environment (`frontend/.env`, gitignored): `GEMINI_API_KEY` (required by `/api/categorizar`) and `DATABASE_URL`. In Docker, compose sets `DATABASE_URL` to the `db` service (password from `POSTGRES_PASSWORD`, default `finscan`); real env vars take precedence over `.env`. The Docker image copies `.env` in via `COPY . .` (it is not in `.dockerignore`). drizzle-kit and the `scripts/` (run with tsx) don't load `.env` on their own, so `drizzle.config.ts` and `scripts/carregar-env.ts` call `process.loadEnvFile`.
+Environment: for Docker, an optional root `.env` (template: `.env.example`) with `GEMINI_API_KEY` and `POSTGRES_PASSWORD`; compose builds `DATABASE_URL` pointing at the `db` service and passes both into the `app` service. For `pnpm dev`, `frontend/.env` (gitignored) holds `GEMINI_API_KEY` and `DATABASE_URL` (`localhost:5433`). `.env*` is in `frontend/.dockerignore`, so no local secret is baked into the image. `GEMINI_API_KEY` is optional: without it `/api/categorizar` returns 503 with an explanatory `erro`, which `/categorizar` displays; everything else works. drizzle-kit and the `scripts/` (run with tsx) don't load `.env` on their own, so `drizzle.config.ts` and `scripts/carregar-env.ts` call `process.loadEnvFile`.
 
 ## Architecture
 

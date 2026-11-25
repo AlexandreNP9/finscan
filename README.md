@@ -37,64 +37,76 @@ A partir desse projeto, espera-se oferecer uma visão completa e detalhada da sa
 
 ---
 
-## 🚀 Como rodar o frontend
-### Rode o docker-compose
+## 🚀 Como rodar com Docker
+
+Pré-requisitos: [Docker](https://docs.docker.com/get-docker/) com o plugin Docker Compose v2 (comando `docker compose`) e Git. Não é preciso instalar Node, pnpm nem PostgreSQL.
+
 ```bash
-cd finscan/frontend   
-docker-compose up --build -d
+git clone https://github.com/AlexandreNP9/finscan.git
+cd finscan
+cp .env.example .env          # opcional: preencha GEMINI_API_KEY para habilitar a IA
+docker compose up --build -d
 ```
 
-Pode ser que precise usar o ```sudo``` no Linux
+> No Linux pode ser preciso usar `sudo docker compose ...`.
 
-O compose sobe também o PostgreSQL (porta `5433` no host) e o container do app aplica as migrations automaticamente ao iniciar.
+O primeiro build leva alguns minutos. O compose sobe o PostgreSQL e, quando o banco estiver pronto, o app aplica as migrations sozinho e começa a responder em **http://localhost:3000**.
 
-### Importe os dados antigos (apenas uma vez)
-Para levar as transações, categorias e agentes de `frontend/data/*.json` para o banco:
+### Primeiro acesso
+1. Abra http://localhost:3000. Você será levado para a tela de login.
+2. Clique em **Criar conta** e cadastre nome, e-mail e senha. A conta já vem com as categorias padrão.
+3. Em **Agentes**, cadastre ao menos uma fonte de pagamento (ex.: "Cartão de crédito"). Ela é necessária para registrar uma nota.
+4. Em **Nova transação**, escaneie o QR Code de uma NFC-e ou cole o HTML da página da SEFAZ.
+5. Em **Categorizar**, use a IA para limpar os nomes dos produtos e classificá-los. Essa é a única parte que exige `GEMINI_API_KEY`. Sem a chave, o app mostra um aviso.
+
+Para ativar a IA depois de subir: gere uma chave em https://aistudio.google.com/app/apikey, coloque em `GEMINI_API_KEY` no `.env` da raiz e rode `docker compose up -d`.
+
+### Comandos úteis
 ```bash
-docker-compose exec finance-web pnpm db:seed
+docker compose logs -f app   # logs do app (scraping, API, IA)
+docker compose down          # para tudo (os dados ficam salvos no volume)
+docker compose down -v       # para tudo e APAGA o banco (recomeça do zero)
 ```
 
-### Rodando sem Docker (desenvolvimento)
-Com um PostgreSQL acessível (ex.: só o serviço `db` do compose, via `docker-compose up -d db`), defina `DATABASE_URL` no `frontend/.env`, junto com a `GEMINI_API_KEY`:
+Se a porta 3000 ou 5433 já estiver em uso, altere o lado esquerdo de `ports` em `docker-compose.yml`.
+
+### Acesso pelo celular
+A leitura do QR Code pela câmera exige HTTPS. Com o app rodando, crie um túnel e abra o link HTTPS gerado:
+```bash
+npx localtunnel --port 3000
+# ou, mais estável:
+ssh -p 443 -R0:localhost:3000 a.pinggy.io
+```
+
+---
+
+## 🧑‍💻 Desenvolvimento (sem Docker para o app)
+
+Suba só o banco e rode o Next.js localmente (Node 20.9+ e pnpm):
+```bash
+docker compose up -d db
+cd frontend
+```
+Crie `frontend/.env` com:
 ```bash
 DATABASE_URL=postgresql://finscan:finscan@localhost:5433/finscan
+GEMINI_API_KEY=sua-chave
 ```
 E então:
 ```bash
 pnpm install
 pnpm db:migrate   # aplica as migrations
-pnpm db:seed      # opcional: importa data/*.json
 pnpm dev
 ```
 Ao alterar `frontend/lib/db/schema.ts`, gere uma nova migration com `pnpm db:generate`.
 
-### Acesse a aplicação
-* No computador, acessar no 
+### Importar os dados antigos (opcional, uma vez)
+Para levar as transações, categorias e agentes de `frontend/data/*.json` para a conta de um usuário já cadastrado:
 ```bash
-http://localhost:3000
+docker compose exec app pnpm db:seed seu@email.com
 ```
 
-* No celular: em um terminal, crie um túnel seguro rodando e acesse o link HTTPS gerado.
-```bash
-npx localtunnel --port 3000
-``` 
-
-* *Alternativa mais estável para o celular*: fazer um ssh com o pinggy.io rodando 
-```bash
-ssh -p 443 -R0:localhost:3000 a.pinggy.io
-```
-
-### Comandos úteis:
-
-Para visualizar os logs da API de scraping
-```bash
-docker-compose logs -f
-```
-
-Para derrubar a aplicação: 
-```bash
-docker-compose down
-```
+---
 
 ## 📄 Licença
 

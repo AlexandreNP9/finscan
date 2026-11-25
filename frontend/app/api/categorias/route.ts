@@ -8,8 +8,8 @@ export async function GET() {
   // Evita que o GET seja pré-renderizado no build (cacheComponents) e tente acessar o banco.
   await connection();
   try {
-    await exigirUsuario();
-    const categorias = await listarNomes(tabelaCategorias);
+    const usuario = await exigirUsuario();
+    const categorias = await listarNomes(tabelaCategorias, usuario.id);
     return NextResponse.json({ sucesso: true, categorias });
   } catch (error) {
     return respostaDeErro(error, 'Erro ao ler categorias');
@@ -18,9 +18,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await exigirUsuario();
+    const usuario = await exigirUsuario();
     const { categorias } = await request.json();
-    await substituirLista(tabelaCategorias, categorias);
+    await substituirLista(tabelaCategorias, categorias, usuario.id);
     return NextResponse.json({ sucesso: true });
   } catch (error) {
     return respostaDeErro(error, 'Erro ao salvar categorias');

@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, getTableColumns, gt, inArray, isNull, lte, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gt, inArray, isNull, lte, notInArray, sql, type Column } from 'drizzle-orm';
 import { db, type Db } from './index';
 import { agentes, categorias, itens, sessoes, transacoes, usuarios } from './schema';
 import { brParaNumeric, ErroValidacao, numericParaBr, validarData, validarHora } from './formato';
+import { CATEGORIAS_PADRAO } from './categorias-padrao';
 import type { Item, Transacao } from '../../types';
 
 // Camada de acesso a dados. A API continua expondo o mesmo formato da época dos arquivos JSON
@@ -11,34 +12,57 @@ import type { Item, Transacao } from '../../types';
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type TabelaLista = typeof categorias | typeof agentes;
 
-// ---------- Categorias / Agentes (listas de nomes) ----------
+/**
+ * Filtro "pertence a este dono". `usuarioId` null só ocorre no seed sem e-mail, que trabalha com
+ * os dados ainda sem dono.
+ */
+function doDono(coluna: Column, usuarioId: number | null) {
+  return usuarioId === null ? isNull(coluna) : eq(coluna, usuarioId);
+}
 
-export async function listarNomes(tabela: TabelaLista): Promise<string[]> {
+// ---------- Categorias / Agentes (listas de nomes, uma por usuário) ----------
+
+export async function listarNomes(tabela: TabelaLista, usuarioId: number): Promise<string[]> {
   const linhas = await db
     .select({ nome: tabela.nome })
     .from(tabela)
+    .where(eq(tabela.usuarioId, usuarioId))
     .orderBy(asc(tabela.ordem), asc(tabela.id));
   return linhas.map((l) => l.nome);
 }
 
-/** Substitui a lista inteira (semântica do POST das telas de gerenciamento). */
-export async function substituirLista(tabela: TabelaLista, nomes: unknown): Promise<void> {
+/** Substitui a lista inteira do usuário (semântica do POST das telas de gerenciamento). */
+export async function substituirLista(tabela: TabelaLista, nomes: unknown, usuarioId: number): Promise<void> {
   if (!Array.isArray(nomes) || nomes.some((n) => typeof n !== 'string')) {
     throw new ErroValidacao('A lista deve ser um array de textos.');
   }
   const limpos = [...new Set((nomes as string[]).map((n) => n.trim()).filter(Boolean))];
+  const doUsuario = eq(tabela.usuarioId, usuarioId);
 
   await db.transaction(async (tx) => {
     if (limpos.length > 0) {
-      await tx.delete(tabela).where(notInArray(tabela.nome, limpos));
+      await tx.delete(tabela).where(and(doUsuario, notInArray(tabela.nome, limpos)));
       await tx
         .insert(tabela)
-        .values(limpos.map((nome, ordem) => ({ nome, ordem })))
-        .onConflictDoUpdate({ target: tabela.nome, set: { ordem: sql`excluded.ordem` } });
+        .values(limpos.map((nome, ordem) => ({ usuarioId, nome, ordem })))
+        .onConflictDoUpdate({ target: [tabela.usuarioId, tabela.nome], set: { ordem: sql`excluded.ordem` } });
     } else {
-      await tx.delete(tabela);
+      await tx.delete(tabela).where(doUsuario);
     }
   });
+}
+
+/** Acrescenta nomes ao fim da lista do dono, ignorando os que já existem (usado pelo seed). */
+export async function acrescentarNomes(tabela: TabelaLista, nomes: string[], usuarioId: number | null): Promise<void> {
+  if (nomes.length === 0) return;
+  const [{ maior }] = await db
+    .select({ maior: sql<number>`coalesce(max(${tabela.ordem}), -1)::int` })
+    .from(tabela)
+    .where(doDono(tabela.usuarioId, usuarioId));
+  await db
+    .insert(tabela)
+    .values(nomes.map((nome, i) => ({ usuarioId, nome, ordem: maior + 1 + i })))
+    .onConflictDoNothing({ target: [tabela.usuarioId, tabela.nome] });
 }
 
 // ---------- Transações ----------
@@ -100,9 +124,9 @@ export async function criarTransacao(payload: unknown, usuarioId: number | null)
   const itensEntrada = exigirItens(p.items);
 
   return db.transaction(async (tx) => {
-    const cabecalho = await lerCabecalho(tx, p);
+    const cabecalho = await lerCabecalho(tx, p, usuarioId);
     const [{ id }] = await tx.insert(transacoes).values({ ...cabecalho, usuarioId }).returning({ id: transacoes.id });
-    const categoriaIds = await resolverCategorias(tx, itensEntrada);
+    const categoriaIds = await resolverCategorias(tx, itensEntrada, usuarioId);
     if (itensEntrada.length > 0) {
       await tx.insert(itens).values(itensEntrada.map((i, ordem) => lerItem(i, ordem, id, categoriaIds)));
     }
@@ -122,7 +146,7 @@ export async function atualizarTransacao(payload: unknown, usuarioId: number): P
   const itensEntrada = exigirItens(p.items);
 
   return db.transaction(async (tx) => {
-    const cabecalho = await lerCabecalho(tx, p);
+    const cabecalho = await lerCabecalho(tx, p, usuarioId);
     const atualizadas = await tx
       .update(transacoes)
       .set(cabecalho)
@@ -133,7 +157,7 @@ export async function atualizarTransacao(payload: unknown, usuarioId: number): P
     const existentes = new Set(
       (await tx.select({ id: itens.id }).from(itens).where(eq(itens.transacaoId, transacaoId))).map((l) => l.id),
     );
-    const categoriaIds = await resolverCategorias(tx, itensEntrada);
+    const categoriaIds = await resolverCategorias(tx, itensEntrada, usuarioId);
     const mantidos = new Set<number>();
 
     for (const [ordem, entrada] of itensEntrada.entries()) {
@@ -153,14 +177,74 @@ export async function atualizarTransacao(payload: unknown, usuarioId: number): P
   });
 }
 
-/** Vincula as transações sem dono (anteriores à autenticação) ao usuário. Retorna quantas. */
-export async function atribuirTransacoesSemDono(usuarioId: number): Promise<number> {
-  const linhas = await db
-    .update(transacoes)
-    .set({ usuarioId })
-    .where(isNull(transacoes.usuarioId))
-    .returning({ id: transacoes.id });
-  return linhas.length;
+export type ResumoAtribuicao = {
+  categorias: { vinculadas: number; mescladas: number };
+  agentes: { vinculados: number; mesclados: number };
+  transacoes: number;
+};
+
+/**
+ * Vincula ao usuário tudo o que não tem dono (dados anteriores à autenticação): categorias,
+ * agentes e transações, numa única transação do banco. Se o usuário já tem uma categoria/agente
+ * com o mesmo nome (ex.: as categorias padrão do cadastro), a linha sem dono é mesclada na dele:
+ * itens/transações passam a apontar para a do usuário e a sem dono é apagada.
+ */
+export async function atribuirDadosSemDono(usuarioId: number): Promise<ResumoAtribuicao> {
+  return db.transaction(async (tx) => {
+    const cat = await atribuirListaSemDono(tx, categorias, usuarioId, async (de, para) => {
+      await tx.update(itens).set({ categoriaId: para }).where(eq(itens.categoriaId, de));
+    });
+    const ag = await atribuirListaSemDono(tx, agentes, usuarioId, async (de, para) => {
+      await tx.update(transacoes).set({ agenteId: para }).where(eq(transacoes.agenteId, de));
+    });
+    const trans = await tx
+      .update(transacoes)
+      .set({ usuarioId })
+      .where(isNull(transacoes.usuarioId))
+      .returning({ id: transacoes.id });
+    return {
+      categorias: { vinculadas: cat.vinculados, mescladas: cat.mesclados },
+      agentes: { vinculados: ag.vinculados, mesclados: ag.mesclados },
+      transacoes: trans.length,
+    };
+  });
+}
+
+async function atribuirListaSemDono(
+  tx: Tx,
+  tabela: TabelaLista,
+  usuarioId: number,
+  redirecionar: (idSemDono: number, idDoUsuario: number) => Promise<void>,
+): Promise<{ vinculados: number; mesclados: number }> {
+  const doUsuario = new Map(
+    (await tx.select({ id: tabela.id, nome: tabela.nome }).from(tabela).where(eq(tabela.usuarioId, usuarioId)))
+      .map((l) => [l.nome, l.id]),
+  );
+  const [{ maior }] = await tx
+    .select({ maior: sql<number>`coalesce(max(${tabela.ordem}), -1)::int` })
+    .from(tabela)
+    .where(eq(tabela.usuarioId, usuarioId));
+  const semDono = await tx
+    .select({ id: tabela.id, nome: tabela.nome })
+    .from(tabela)
+    .where(isNull(tabela.usuarioId))
+    .orderBy(asc(tabela.ordem), asc(tabela.id));
+
+  let vinculados = 0;
+  let mesclados = 0;
+  for (const linha of semDono) {
+    const existente = doUsuario.get(linha.nome);
+    if (existente !== undefined) {
+      await redirecionar(linha.id, existente);
+      await tx.delete(tabela).where(eq(tabela.id, linha.id));
+      mesclados++;
+    } else {
+      // Vai para o fim da lista do usuário, mantendo a ordem relativa antiga.
+      await tx.update(tabela).set({ usuarioId, ordem: maior + 1 + vinculados }).where(eq(tabela.id, linha.id));
+      vinculados++;
+    }
+  }
+  return { vinculados, mesclados };
 }
 
 // ---------- Usuários / Sessões ----------
@@ -171,7 +255,7 @@ export function normalizarEmail(valor: unknown): string {
   return texto(valor).toLowerCase();
 }
 
-/** Cria a conta. `senhaHash` já vem calculado (lib/auth.ts); aqui só se valida nome e e-mail. */
+/** Cria a conta com as categorias padrão. `senhaHash` já vem calculado (lib/auth.ts); aqui só se valida nome e e-mail. */
 export async function criarUsuario(nome: unknown, email: unknown, senhaHash: string): Promise<Usuario> {
   const nomeLimpo = texto(nome);
   const emailLimpo = normalizarEmail(email);
@@ -181,13 +265,17 @@ export async function criarUsuario(nome: unknown, email: unknown, senhaHash: str
     throw new ErroValidacao('E-mail inválido.');
   }
 
-  const [criado] = await db
-    .insert(usuarios)
-    .values({ nome: nomeLimpo, email: emailLimpo, senhaHash })
-    .onConflictDoNothing({ target: usuarios.email })
-    .returning({ id: usuarios.id, nome: usuarios.nome, email: usuarios.email });
-  if (!criado) throw new ErroValidacao('E-mail já cadastrado.');
-  return criado;
+  // Usuário e categorias padrão juntos: não pode existir conta sem a lista inicial.
+  return db.transaction(async (tx) => {
+    const [criado] = await tx
+      .insert(usuarios)
+      .values({ nome: nomeLimpo, email: emailLimpo, senhaHash })
+      .onConflictDoNothing({ target: usuarios.email })
+      .returning({ id: usuarios.id, nome: usuarios.nome, email: usuarios.email });
+    if (!criado) throw new ErroValidacao('E-mail já cadastrado.');
+    await tx.insert(categorias).values(CATEGORIAS_PADRAO.map((nome, ordem) => ({ usuarioId: criado.id, nome, ordem })));
+    return criado;
+  });
 }
 
 export async function buscarUsuarioPorEmail(email: unknown) {
@@ -233,11 +321,14 @@ function texto(valor: unknown): string {
   return typeof valor === 'string' ? valor.trim() : valor === undefined || valor === null ? '' : String(valor).trim();
 }
 
-async function lerCabecalho(tx: Tx, p: Objeto) {
+async function lerCabecalho(tx: Tx, p: Objeto, usuarioId: number | null) {
   const nomeAgente = texto(p.agenteOrigem);
   let agenteId: number | null = null;
   if (nomeAgente) {
-    const [agente] = await tx.select({ id: agentes.id }).from(agentes).where(eq(agentes.nome, nomeAgente));
+    const [agente] = await tx
+      .select({ id: agentes.id })
+      .from(agentes)
+      .where(and(doDono(agentes.usuarioId, usuarioId), eq(agentes.nome, nomeAgente)));
     if (!agente) throw new ErroValidacao(`Agente "${nomeAgente}" não está cadastrado.`);
     agenteId = agente.id;
   }
@@ -253,15 +344,15 @@ async function lerCabecalho(tx: Tx, p: Objeto) {
   };
 }
 
-/** Mapeia nome → id das categorias usadas pelos itens; erro se alguma não estiver cadastrada. */
-async function resolverCategorias(tx: Tx, itensEntrada: Objeto[]): Promise<Map<string, number>> {
+/** Mapeia nome → id das categorias do usuário usadas pelos itens; erro se alguma não estiver cadastrada. */
+async function resolverCategorias(tx: Tx, itensEntrada: Objeto[], usuarioId: number | null): Promise<Map<string, number>> {
   const nomes = [...new Set(itensEntrada.map((i) => texto(i.categoria)).filter(Boolean))];
   if (nomes.length === 0) return new Map();
 
   const linhas = await tx
     .select({ id: categorias.id, nome: categorias.nome })
     .from(categorias)
-    .where(inArray(categorias.nome, nomes));
+    .where(and(doDono(categorias.usuarioId, usuarioId), inArray(categorias.nome, nomes)));
   const mapa = new Map(linhas.map((l) => [l.nome, l.id]));
   const faltando = nomes.filter((n) => !mapa.has(n));
   if (faltando.length > 0) {

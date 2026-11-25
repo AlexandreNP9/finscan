@@ -8,8 +8,8 @@ export async function GET() {
   // Evita que o GET seja pré-renderizado no build (cacheComponents) e tente acessar o banco.
   await connection();
   try {
-    await exigirUsuario();
-    const agentes = await listarNomes(tabelaAgentes);
+    const usuario = await exigirUsuario();
+    const agentes = await listarNomes(tabelaAgentes, usuario.id);
     return NextResponse.json({ sucesso: true, agentes });
   } catch (error) {
     return respostaDeErro(error, 'Erro ao ler agentes');
@@ -18,9 +18,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await exigirUsuario();
+    const usuario = await exigirUsuario();
     const { agentes } = await request.json();
-    await substituirLista(tabelaAgentes, agentes);
+    await substituirLista(tabelaAgentes, agentes, usuario.id);
     return NextResponse.json({ sucesso: true });
   } catch (error) {
     return respostaDeErro(error, 'Erro ao salvar agentes');

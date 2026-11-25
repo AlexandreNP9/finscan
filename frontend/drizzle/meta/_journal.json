@@ -15,6 +15,13 @@
       "when": 1795644633923,
       "tag": "0001_autenticacao",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795647832362,
+      "tag": "0002_categorias_agentes_por_usuario",
+      "breakpoints": true
     }
   ]
 }

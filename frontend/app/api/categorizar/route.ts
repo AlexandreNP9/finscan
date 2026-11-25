@@ -2,14 +2,19 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { categorias } from '../../../lib/db/schema';
 import { listarNomes } from '../../../lib/db/repositorio';
-import { bloquearSemLogin } from '../../../lib/api';
+import { respostaDeErro } from '../../../lib/api';
+import { exigirUsuario } from '../../../lib/auth';
 
 // Inicializa o SDK com a sua chave do .env
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(request: Request) {
-    const semLogin = await bloquearSemLogin();
-    if (semLogin) return semLogin;
+    let usuarioId: number;
+    try {
+        usuarioId = (await exigirUsuario()).id;
+    } catch (error) {
+        return respostaDeErro(error, 'Erro ao verificar sessão');
+    }
 
     try {
         const { itens } = await request.json();
@@ -18,8 +23,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Nenhum item enviado' }, { status: 400 });
         }
 
-        // Lidas do banco a cada chamada, para refletir edições feitas em /categorias.
-        const categoriasCadastradas = await listarNomes(categorias);
+        // Categorias do usuário, lidas a cada chamada para refletir edições feitas em /categorias.
+        const categoriasCadastradas = await listarNomes(categorias, usuarioId);
 
         // Inicialização otimizada para velocidade e precisão
         const model = genAI.getGenerativeModel({

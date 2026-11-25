@@ -4,15 +4,16 @@
 // Com `email` (de uma conta já criada em /cadastro), as transações importadas ficam vinculadas a
 // esse usuário. Sem ele, ficam sem dono e só aparecem depois de `pnpm db:atribuir <email>`.
 //
-// Categorias e agentes são mesclados (nomes existentes são mantidos). Transações só são
-// importadas se a tabela estiver vazia, para o script não duplicar dados se rodar de novo.
+// Categorias e agentes são acrescentados à lista do dono (nomes que ele já tem são mantidos).
+// Transações só são importadas se a tabela estiver vazia, para o script não duplicar dados se
+// rodar de novo.
 import './carregar-env';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sql } from 'drizzle-orm';
 import { db } from '../lib/db';
 import { agentes, categorias, transacoes } from '../lib/db/schema';
-import { buscarUsuarioPorEmail, criarTransacao } from '../lib/db/repositorio';
+import { acrescentarNomes, buscarUsuarioPorEmail, criarTransacao } from '../lib/db/repositorio';
 
 function lerJson<T>(arquivo: string): T {
   return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', arquivo), 'utf8'));
@@ -40,14 +41,9 @@ async function main() {
   const todasCategorias = [...new Set([...nomesCategorias, ...categoriasUsadas].map((n) => n.trim()).filter(Boolean))];
   const todosAgentes = [...new Set([...nomesAgentes, ...agentesUsados].map((n) => n.trim()).filter(Boolean))];
 
-  await db
-    .insert(categorias)
-    .values(todasCategorias.map((nome, ordem) => ({ nome, ordem })))
-    .onConflictDoNothing({ target: categorias.nome });
-  await db
-    .insert(agentes)
-    .values(todosAgentes.map((nome, ordem) => ({ nome, ordem })))
-    .onConflictDoNothing({ target: agentes.nome });
+  // Com e-mail, vão para a lista desse usuário (que já tem as categorias padrão); sem, ficam sem dono.
+  await acrescentarNomes(categorias, todasCategorias, usuarioId);
+  await acrescentarNomes(agentes, todosAgentes, usuarioId);
   console.log(`Categorias: ${todasCategorias.length}, agentes: ${todosAgentes.length}`);
 
   const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(transacoes);

@@ -35,11 +35,20 @@ export default function NovaTransacao() {
   const [agenteOrigem, setAgenteOrigem] = useState('');
   
   const [listaAgentes, setListaAgentes] = useState<string[]>([]);
+  const [agentesCarregados, setAgentesCarregados] = useState(false);
 
   useEffect(() => {
-    buscarApi('/api/agentes').then(res => res.json()).then(data => {
-      if (data.sucesso) setListaAgentes(data.agentes);
-    });
+    const carregarAgentes = () => {
+      buscarApi('/api/agentes').then(res => res.json()).then(data => {
+        if (data.sucesso) setListaAgentes(data.agentes);
+        setAgentesCarregados(true);
+      });
+    };
+    carregarAgentes();
+    // O aviso de "nenhum agente" abre /agentes em outra aba; ao voltar, a lista é recarregada
+    // sem perder a nota já lida nesta tela.
+    window.addEventListener('focus', carregarAgentes);
+    return () => window.removeEventListener('focus', carregarAgentes);
   }, []);
 
   const processarSefazURL = async (urlConsulta: string) => {
@@ -241,6 +250,15 @@ export default function NovaTransacao() {
                       </select>
                       <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                     </div>
+                    {agentesCarregados && listaAgentes.length === 0 && (
+                      <p className="mt-2 text-[12px] text-[#92400e] bg-[#fffbeb] border border-[#fde68a] rounded-lg px-3 py-2">
+                        Você ainda não cadastrou nenhuma conta ou cartão.{' '}
+                        <a href="/agentes" target="_blank" rel="noopener" className="font-semibold text-[#1d4ed8] underline">
+                          Cadastrar agora
+                        </a>{' '}
+                        (abre em outra aba; ao voltar, a lista é atualizada).
+                      </p>
+                    )}
                   </div>
 
                   <div className="bg-white rounded-xl border border-[#e8eaed] p-4 space-y-3.5 opacity-80 pointer-events-none">

@@ -1,17 +1,35 @@
-import { bigint, date, index, integer, numeric, pgTable, serial, text, time, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, date, index, integer, numeric, pgTable, serial, text, time, timestamp, unique } from 'drizzle-orm/pg-core';
 
-// Listas editáveis pela UI (/categorias e /agentes). `ordem` preserva a ordem definida pelo usuário.
-export const categorias = pgTable('categorias', {
-  id: serial('id').primaryKey(),
-  nome: text('nome').notNull().unique(),
-  ordem: integer('ordem').notNull().default(0),
-});
+// Listas editáveis pela UI (/categorias e /agentes), uma por usuário. `ordem` preserva a ordem
+// definida por ele. O nome é único por dono; `usuario_id` null = dado anterior à autenticação,
+// ainda não atribuído (`pnpm db:atribuir`). NULLS NOT DISTINCT mantém esses nomes únicos também.
+export const categorias = pgTable(
+  'categorias',
+  {
+    id: serial('id').primaryKey(),
+    usuarioId: integer('usuario_id').references(() => usuarios.id, { onDelete: 'cascade' }),
+    nome: text('nome').notNull(),
+    ordem: integer('ordem').notNull().default(0),
+  },
+  (t) => [
+    unique('categorias_usuario_id_nome_unique').on(t.usuarioId, t.nome).nullsNotDistinct(),
+    index('categorias_usuario_id_idx').on(t.usuarioId),
+  ],
+);
 
-export const agentes = pgTable('agentes', {
-  id: serial('id').primaryKey(),
-  nome: text('nome').notNull().unique(),
-  ordem: integer('ordem').notNull().default(0),
-});
+export const agentes = pgTable(
+  'agentes',
+  {
+    id: serial('id').primaryKey(),
+    usuarioId: integer('usuario_id').references(() => usuarios.id, { onDelete: 'cascade' }),
+    nome: text('nome').notNull(),
+    ordem: integer('ordem').notNull().default(0),
+  },
+  (t) => [
+    unique('agentes_usuario_id_nome_unique').on(t.usuarioId, t.nome).nullsNotDistinct(),
+    index('agentes_usuario_id_idx').on(t.usuarioId),
+  ],
+);
 
 // Contas de acesso. `email` é gravado normalizado (minúsculas, sem espaços); `senhaHash` é bcrypt.
 export const usuarios = pgTable('usuarios', {

@@ -22,5 +22,5 @@ RUN pnpm build
 # Expõe a porta que o Next.js usa
 EXPOSE 3000
 
-# Comando para iniciar o servidor de produção
-CMD ["pnpm", "start"]
+# Aplica as migrations pendentes do banco e inicia o servidor de produção
+CMD ["sh", "-c", "pnpm db:migrate && pnpm start"]

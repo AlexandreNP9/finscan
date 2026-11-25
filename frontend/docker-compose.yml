@@ -1,4 +1,24 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: finscan-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finscan
+      # Defina POSTGRES_PASSWORD no .env para trocar a senha padrão de desenvolvimento.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finscan}
+      POSTGRES_DB: finscan
+    ports:
+      # Exposto em 5433 no host para rodar `pnpm dev` localmente contra o banco do container.
+      - "5433:5432"
+    volumes:
+      - finscan-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finscan -d finscan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   finance-web:
     container_name: frontend
     build:
@@ -7,5 +27,12 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       - NODE_ENV=production
+      - DATABASE_URL=postgresql://finscan:${POSTGRES_PASSWORD:-finscan}@db:5432/finscan
+
+volumes:
+  finscan-db:

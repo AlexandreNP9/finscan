@@ -1,48 +1,53 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { buscarApi } from '../../lib/cliente';
-import { BackIcon, SparkleIcon, RefreshIcon, WarningIcon } from '../../components/icons';
-import { Item } from '../../types';
+import { formatarBRL, formatarData } from '../../lib/moeda';
+import Estrutura from '../../components/Estrutura';
+import Aviso from '../../components/Aviso';
+import Botao, { LinkBotao, Spinner } from '../../components/Botao';
+import { BackIcon, ChevronIcon, SparkleIcon } from '../../components/icons';
+import type { Item, Transacao } from '../../types';
+
+type Sugestao = { id: number; categoria: string };
+
+const semCategoria = (t: Transacao) => t.items.filter((i) => i.categoria === '').length;
 
 export default function CategorizarProdutos() {
-  const [transacoes, setTransacoes] = useState<any[]>([]);
-  const [transacaoAtiva, setTransacaoAtiva] = useState<any | null>(null);
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [transacaoAtiva, setTransacaoAtiva] = useState<Transacao | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [erroCarregar, setErroCarregar] = useState('');
   const [categorias, setCategorias] = useState<string[]>([]);
 
-  // Estados da IA (Aqueles que já tínhamos lapidado!)
   const [isCategorizando, setIsCategorizando] = useState(false);
-  const [mensagemIA, setMensagemIA] = useState('Processando com IA...');
+  const [mensagemIA, setMensagemIA] = useState('');
   const [tempoIA, setTempoIA] = useState(0);
   const [statusIA, setStatusIA] = useState<'idle' | 'sucesso' | 'erro'>('idle');
   const [mensagemStatus, setMensagemStatus] = useState('');
   const [isSalvando, setIsSalvando] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState('');
 
-  // Busca as transações do banco local
   const carregarTransacoes = () => {
     buscarApi('/api/transacoes')
       .then(res => res.json())
       .then(data => {
         if (data.sucesso) {
-          // Filtra apenas transações que tenham pelo menos 1 item sem categoria
-          const pendentes = data.transacoes.filter((t: any) => 
-            t.items && t.items.some((i: Item) => i.categoria === '')
-          );
-          setTransacoes(pendentes);
+          setTransacoes(data.transacoes.filter((t: Transacao) => t.items?.some((i) => i.categoria === '')));
+        } else {
+          setErroCarregar(data.erro || 'Não foi possível carregar as pendências.');
         }
-        setIsLoading(false);
-      });
+      })
+      .catch(() => setErroCarregar('Erro de conexão.'))
+      .finally(() => setIsLoading(false));
   };
 
   // Categorias do usuário logado (as mesmas que a IA recebe no prompt)
   const carregarCategorias = () => {
     buscarApi('/api/categorias')
       .then(res => res.json())
-      .then(data => {
-        if (data.sucesso) setCategorias(data.categorias);
-      });
+      .then(data => { if (data.sucesso) setCategorias(data.categorias); })
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -50,29 +55,33 @@ export default function CategorizarProdutos() {
     carregarCategorias();
   }, []);
 
-  // O Relógio da IA
+  // Cronômetro enquanto a IA trabalha
   useEffect(() => {
-    let intervalo: NodeJS.Timeout;
-    if (isCategorizando) {
-      intervalo = setInterval(() => setTempoIA(s => s + 1), 1000);
-    } else {
-      setTempoIA(0);
-    }
-    return () => clearInterval(intervalo);
+    if (!isCategorizando) return;
+    const intervalo = setInterval(() => setTempoIA(s => s + 1), 1000);
+    return () => { clearInterval(intervalo); setTempoIA(0); };
   }, [isCategorizando]);
+
+  const abrir = (t: Transacao | null) => {
+    setTransacaoAtiva(t);
+    setStatusIA('idle');
+    setMensagemStatus('');
+    setErroSalvar('');
+    window.scrollTo({ top: 0 });
+  };
 
   const categorizarComIA = async () => {
     if (!transacaoAtiva) return;
     setIsCategorizando(true);
     setStatusIA('idle');
-    setMensagemIA('Conectando à IA...');
+    setMensagemIA('Conectando à IA…');
 
     const tempoInicio = Date.now();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 35000); // Fail Fast de 35s
+    const timeoutId = setTimeout(() => controller.abort(), 35000); // falha rápida em 35s
 
-    const t1 = setTimeout(() => setMensagemIA('Analisando os itens...'), 3000);
-    const t2 = setTimeout(() => setMensagemIA('Cruzando dados...'), 7000);
+    const t1 = setTimeout(() => setMensagemIA('Analisando os itens…'), 3000);
+    const t2 = setTimeout(() => setMensagemIA('Escolhendo as categorias…'), 7000);
 
     try {
       const itensSimplificados = transacaoAtiva.items.map((i: Item) => ({ id: i.id, descricao: i.descricao }));
@@ -85,203 +94,190 @@ export default function CategorizarProdutos() {
       });
 
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.erro || 'Erro na Inteligência Artificial.');
+      if (!res.ok) throw new Error(data?.erro || data?.error || 'Erro na inteligência artificial.');
 
       if (data.sucesso) {
-        // Atualiza os itens da transação ativa com as respostas da IA
-        const itensAtualizados = transacaoAtiva.items.map((itemAntigo: Item) => {
-          const sugestao = data.resultado.find((r: any) => r.id === itemAntigo.id);
+        const resultado: Sugestao[] = data.resultado;
+        const itensAtualizados = transacaoAtiva.items.map((itemAntigo) => {
+          const sugestao = resultado.find((r) => r.id === itemAntigo.id);
           return sugestao ? { ...itemAntigo, categoria: sugestao.categoria } : itemAntigo;
         });
-
         setTransacaoAtiva({ ...transacaoAtiva, items: itensAtualizados });
-        
+
         const seg = Math.floor((Date.now() - tempoInicio) / 1000);
         setStatusIA('sucesso');
-        setMensagemStatus(`Concluído em ${seg}s`);
+        setMensagemStatus(`Sugestões aplicadas em ${seg}s. Confira antes de salvar.`);
       }
-    } catch (error: any) {
+    } catch (error) {
       setStatusIA('erro');
-      setMensagemStatus(error.name === 'AbortError' ? 'Tempo limite (35s) excedido.' : (error.message || 'Erro na Inteligência Artificial.'));
+      const e = error as Error;
+      setMensagemStatus(e.name === 'AbortError' ? 'A IA demorou mais de 35s. Tente de novo.' : (e.message || 'Erro na inteligência artificial.'));
     } finally {
       clearTimeout(timeoutId); clearTimeout(t1); clearTimeout(t2);
       setIsCategorizando(false);
-      setMensagemIA('Processando com IA...');
     }
   };
 
   const atualizarCategoriaItem = (idItem: number, novaCat: string) => {
-    const itensAtualizados = transacaoAtiva.items.map((i: Item) => 
-      i.id === idItem ? { ...i, categoria: novaCat } : i
-    );
-    setTransacaoAtiva({ ...transacaoAtiva, items: itensAtualizados });
+    if (!transacaoAtiva) return;
+    setTransacaoAtiva({
+      ...transacaoAtiva,
+      items: transacaoAtiva.items.map((i) => (i.id === idItem ? { ...i, categoria: novaCat } : i)),
+    });
   };
 
   const salvarTransacaoCategorizada = async () => {
-    // Verifica se sobrou algum item sem categoria
-    const temSemCategoria = transacaoAtiva.items.some((i: Item) => i.categoria === '');
-    if (temSemCategoria) {
-      alert("Ainda existem itens sem categoria!");
-      return;
-    }
-
+    if (!transacaoAtiva || semCategoria(transacaoAtiva) > 0) return;
     setIsSalvando(true);
+    setErroSalvar('');
     try {
       const res = await buscarApi('/api/transacoes', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(transacaoAtiva)
       });
-
       if (res.ok) {
-        setTransacaoAtiva(null); // Fecha a visão de detalhes
-        setStatusIA('idle'); // Reseta a IA
-        carregarTransacoes(); // Recarrega a lista (o que foi salvo vai sumir da caixa de entrada!)
+        abrir(null);
+        carregarTransacoes(); // o que foi salvo sai da lista
       } else {
-        alert("Erro ao salvar.");
+        const data = await res.json().catch(() => null);
+        setErroSalvar(data?.erro || 'Não foi possível salvar.');
       }
-    } catch (e) {
-      alert("Erro de conexão.");
+    } catch {
+      setErroSalvar('Erro de conexão.');
     } finally {
       setIsSalvando(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#f4f5f7] flex justify-center md:items-start md:py-10">
-      <div className="w-full max-w-[430px] md:max-w-[960px] bg-white md:rounded-2xl md:shadow-lg overflow-hidden flex flex-col min-h-screen md:min-h-[85vh]">
-        
-        <header className="sticky top-0 z-20 bg-white border-b border-[#e8eaed] px-4 py-4 flex items-center justify-between">
-          <button onClick={() => transacaoAtiva ? setTransacaoAtiva(null) : window.location.href = '/'} className="w-10 h-10 flex items-center justify-center rounded-xl text-[#6b7280] hover:bg-[#f4f5f7] transition-colors">
-            <BackIcon />
+  // ── Detalhe de uma nota ──
+  if (transacaoAtiva) {
+    const total = transacaoAtiva.items.length;
+    const feitos = total - semCategoria(transacaoAtiva);
+    const completo = feitos === total;
+
+    return (
+      <Estrutura semNavInferior pendentes={transacoes.length}>
+        <div className="pb-24 md:pb-0">
+          <button
+            type="button"
+            onClick={() => abrir(null)}
+            className="-ml-2 inline-flex items-center gap-1.5 min-h-11 px-2 rounded-lg text-[15px] text-texto-2 hover:bg-black/5"
+          >
+            <BackIcon /> Pendências
           </button>
-          <div className="flex items-center gap-2">
-            <SparkleIcon />
-            <h1 className="text-[16px] font-bold text-[#111827]">Caixa de Entrada IA</h1>
-          </div>
-          <div className="w-10"></div>
-        </header>
 
-        <div className="flex-1 overflow-y-auto bg-[#f9fafb] p-4 md:p-6">
-          
-          {isLoading ? (
-            <p className="text-center text-[#9ca3af] mt-10">Buscando pendências...</p>
-          ) : !transacaoAtiva ? (
-            /* VISÃO 1: LISTA DE PENDÊNCIAS */
-            <div className="space-y-4 animate-in fade-in">
-              <h2 className="text-[13px] font-bold text-[#6b7280] tracking-widest uppercase mb-4">
-                Aguardando Categorização ({transacoes.length})
-              </h2>
-              
-              {transacoes.length === 0 ? (
-                <div className="bg-white border border-[#e8eaed] rounded-2xl p-8 text-center flex flex-col items-center">
-                  <div className="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-4">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  </div>
-                  <h3 className="text-[16px] font-bold text-[#111827]">Tudo limpo!</h3>
-                  <p className="text-[13px] text-[#6b7280] mt-1">Nenhuma nota fiscal pendente de categorização.</p>
-                </div>
-              ) : (
-                transacoes.map((t) => {
-                  const qtdPendentes = t.items.filter((i: Item) => i.categoria === '').length;
-                  return (
-                    <button 
-                      key={t.id} 
-                      onClick={() => setTransacaoAtiva(t)}
-                      className="w-full bg-white border border-[#e8eaed] rounded-xl p-4 text-left flex items-center justify-between hover:border-[#7c3aed] hover:shadow-md transition-all active:scale-[0.98]"
+          <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
+            <div className="min-w-0">
+              <h1 className="text-[22px] md:text-[24px] font-semibold tracking-tight">{transacaoAtiva.estabelecimento || 'Estabelecimento desconhecido'}</h1>
+              <p className="text-[14px] text-texto-3 tabular-nums">{formatarData(transacaoAtiva.dataEmissao)} · {formatarBRL(transacaoAtiva.valorTotal)}</p>
+            </div>
+          </div>
+
+          {/* Progresso (efeito do gradiente de meta) */}
+          <div className="mt-6">
+            <div className="flex items-baseline justify-between text-[14px]">
+              <span className="text-texto-2"><span className="font-semibold text-texto tabular-nums">{feitos} de {total}</span> itens categorizados</span>
+              {completo && <span className="text-sucesso font-medium">Pronto para salvar</span>}
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-linha" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={feitos} aria-label="Itens categorizados">
+              <div className={`h-1.5 rounded-full transition-all ${completo ? 'bg-sucesso' : 'bg-acao'}`} style={{ width: `${total ? (feitos / total) * 100 : 0}%` }} />
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Botao variante="secundario" onClick={categorizarComIA} disabled={isCategorizando}>
+              {isCategorizando ? <Spinner /> : <SparkleIcon />}
+              {statusIA === 'sucesso' ? 'Sugerir de novo com IA' : 'Sugerir categorias com IA'}
+            </Botao>
+            {isCategorizando && (
+              <span role="status" className="text-[14px] text-texto-3">
+                {mensagemIA} <span className="tabular-nums">{tempoIA}s</span>
+              </span>
+            )}
+            {!isCategorizando && statusIA === 'sucesso' && <span role="status" className="text-[14px] text-sucesso">{mensagemStatus}</span>}
+          </div>
+          {!isCategorizando && statusIA === 'erro' && <Aviso tipo="erro" className="mt-3">{mensagemStatus}</Aviso>}
+
+          <ul className="mt-6 divide-y divide-linha border-t border-linha-forte">
+            {transacaoAtiva.items.map((item) => {
+              const pendente = item.categoria === '';
+              return (
+                <li key={item.id} className="py-3 grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_7rem_16rem] gap-x-4 gap-y-2 items-center">
+                  <span className="text-[15px] min-w-0">{item.descricao}</span>
+                  <span className="valor text-[15px]">{formatarBRL(item.vlTotal)}</span>
+                  <div className="relative col-span-2 md:col-span-1">
+                    <select
+                      value={item.categoria}
+                      onChange={e => atualizarCategoriaItem(item.id, e.target.value)}
+                      aria-label={`Categoria de ${item.descricao}`}
+                      className={`w-full min-h-11 rounded-lg border bg-superficie px-3 pr-9 text-[15px] appearance-none outline-none focus:border-acao ${
+                        pendente ? 'border-alerta text-texto-3' : 'border-linha-forte text-texto'
+                      }`}
                     >
-                      <div>
-                        <p className="text-[14px] font-bold text-[#111827]">{t.estabelecimento || 'Estabelecimento Desconhecido'}</p>
-                        <p className="text-[11px] text-[#6b7280] mt-0.5">{t.dataEmissao.split('-').reverse().join('/')} • {t.agenteOrigem}{t.usuario && ` • Registrado por ${t.usuario}`}</p>
-                        <div className="mt-2 inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-md">
-                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
-                          {qtdPendentes} iten(s) pendente(s)
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[14px] font-bold text-[#111827] font-mono">R$ {t.valorTotal}</p>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          ) : (
-            /* VISÃO 2: DETALHES DA TRANSAÇÃO (Categorizar) */
-            <div className="animate-in slide-in-from-right-4">
-              <div className="bg-white border border-[#e8eaed] rounded-xl p-4 mb-4">
-                <p className="text-[14px] font-bold text-[#111827]">{transacaoAtiva.estabelecimento}</p>
-                <p className="text-[11px] text-[#6b7280]">{transacaoAtiva.dataEmissao.split('-').reverse().join('/')} • R$ {transacaoAtiva.valorTotal}</p>
-              </div>
-
-              {/* O famoso botão da Inteligência Artificial */}
-              <button
-                onClick={categorizarComIA}
-                disabled={isCategorizando}
-                className={`w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl border text-[12px] font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${
-                  isCategorizando ? 'border-[#7c3aed]/25 bg-[#faf5ff] text-[#7c3aed]' :
-                  statusIA === 'sucesso' ? 'border-green-300 bg-green-50 text-green-700' :
-                  statusIA === 'erro' ? 'border-red-300 bg-red-50 text-red-600' :
-                  'border-[#7c3aed] bg-[#7c3aed] text-white shadow-lg shadow-[#7c3aed]/20 hover:bg-[#6d28d9]'
-                }`}
-              >
-                {isCategorizando ? (
-                  <span className="flex items-center gap-2">
-                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                    {mensagemIA} <span className="font-mono bg-current/10 px-1.5 py-0.5 rounded text-[10px] ml-1">{tempoIA}s</span>
-                  </span>
-                ) : statusIA === 'sucesso' ? (
-                  <><RefreshIcon /> Recategorizar ({mensagemStatus})</>
-                ) : statusIA === 'erro' ? (
-                  <><WarningIcon /> {mensagemStatus}</>
-                ) : (
-                  <><SparkleIcon /> Categorizar {transacaoAtiva.items.length} itens com IA</>
-                )}
-              </button>
-
-              <div className="space-y-3 pb-20 md:pb-0">
-                {transacaoAtiva.items.map((item: Item) => (
-                  <div key={item.id} className="border border-[#e8eaed] rounded-xl overflow-hidden bg-white shadow-sm">
-                    <div className="flex items-center justify-between bg-[#f9fafb] px-3 py-2 border-b border-[#e8eaed]">
-                      <span className="flex-1 text-[11px] md:text-[12px] font-semibold text-[#111827] truncate mr-2">{item.descricao}</span>
-                      <span className="text-[11px] md:text-[12px] font-bold text-[#111827] font-mono">R$ {item.vlTotal}</span>
-                    </div>
-                    <div className="px-3 py-2">
-                      <div className="relative">
-                        <select
-                          value={item.categoria}
-                          onChange={e => atualizarCategoriaItem(item.id, e.target.value)}
-                          className={`w-full text-[11px] md:text-[12px] font-medium rounded-md px-2 py-2 outline-none appearance-none pr-6 transition-colors ${
-                            item.categoria === '' ? 'text-orange-600 border-orange-300 bg-orange-50 border' : 'text-[#374151] bg-[#f4f5f7] border border-[#e8eaed]'
-                          }`}
-                        >
-                          <option disabled value="">Sem Categoria (Pendência)</option>
-                          {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                        <svg className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9ca3af] pointer-events-none" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
-                      </div>
-                    </div>
+                      <option disabled value="">Escolher categoria…</option>
+                      {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <ChevronIcon className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-texto-3" />
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
 
-        {/* FOOTER (Só aparece se uma transação estiver ativa) */}
-        {transacaoAtiva && (
-          <div className="absolute md:relative bottom-0 left-0 w-full bg-white border-t border-[#e8eaed] px-4 py-3 md:px-6 md:py-4 z-10">
-            <button
-              onClick={salvarTransacaoCategorizada}
-              disabled={isSalvando}
-              className="w-full py-3.5 rounded-xl bg-[#111827] text-white text-[14px] font-bold hover:bg-black transition-all shadow-lg disabled:opacity-70"
-            >
-              {isSalvando ? 'Salvando...' : 'Confirmar Categorias e Salvar'}
-            </button>
+          {erroSalvar && <Aviso tipo="erro" className="mt-6">{erroSalvar}</Aviso>}
+
+          <div className="fixed md:static bottom-0 inset-x-0 z-20 bg-superficie md:bg-transparent border-t md:border-0 border-linha px-4 pt-3 pb-seguro md:p-0 md:mt-8 md:flex md:justify-end">
+            <Botao onClick={salvarTransacaoCategorizada} disabled={isSalvando || !completo} className="w-full md:w-auto min-h-12 md:px-8">
+              {isSalvando ? <><Spinner /> Salvando…</> : completo ? 'Salvar categorias' : `Faltam ${total - feitos} ${total - feitos === 1 ? 'item' : 'itens'}`}
+            </Botao>
           </div>
-        )}
+        </div>
+      </Estrutura>
+    );
+  }
 
-      </div>
-    </div>
+  // ── Lista de pendências ──
+  return (
+    <Estrutura pendentes={transacoes.length}>
+      <h1 className="text-[24px] font-semibold tracking-tight">Categorizar</h1>
+      <p className="mt-1 text-texto-2">Notas com itens que ainda não têm categoria.</p>
+
+      {isLoading ? (
+        <p className="mt-6 text-texto-3">Carregando…</p>
+      ) : erroCarregar ? (
+        <Aviso tipo="erro" className="mt-6">{erroCarregar}</Aviso>
+      ) : transacoes.length === 0 ? (
+        <div className="mt-8">
+          <p className="text-[17px] font-semibold">Tudo categorizado.</p>
+          <p className="mt-1 text-texto-2">Quando você registrar uma nova compra, os itens aparecem aqui.</p>
+          <LinkBotao href="/nova-transacao" variante="secundario" className="mt-4">Registrar compra</LinkBotao>
+        </div>
+      ) : (
+        <ul className="mt-6 divide-y divide-linha border-y border-linha md:max-w-3xl">
+          {transacoes.map((t) => {
+            const qtd = semCategoria(t);
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => abrir(t)}
+                  className="w-full py-3.5 text-left grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 items-baseline group"
+                >
+                  <span className="text-[15px] truncate group-hover:underline underline-offset-2">{t.estabelecimento || 'Estabelecimento desconhecido'}</span>
+                  <span className="valor text-[15px] font-medium">{formatarBRL(t.valorTotal)}</span>
+                  <span className="text-[13px] text-texto-3 truncate">
+                    {formatarData(t.dataEmissao)}{t.agenteOrigem && ` · ${t.agenteOrigem}`}
+                  </span>
+                  <span className="text-[13px] text-alerta text-right tabular-nums">
+                    {qtd} {qtd === 1 ? 'item pendente' : 'itens pendentes'}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Estrutura>
   );
 }

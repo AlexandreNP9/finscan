@@ -1,28 +1,25 @@
-import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const dataFilePath = path.join(process.cwd(), 'data', 'agentes.json');
+import { NextResponse, connection } from 'next/server';
+import { agentes as tabelaAgentes } from '../../../lib/db/schema';
+import { listarNomes, substituirLista } from '../../../lib/db/repositorio';
+import { respostaDeErro } from '../../../lib/api';
 
 export async function GET() {
+  // Evita que o GET seja pré-renderizado no build (cacheComponents) e tente acessar o banco.
+  await connection();
   try {
-    if (!fs.existsSync(dataFilePath)) {
-      fs.writeFileSync(dataFilePath, JSON.stringify([]), 'utf8');
-    }
-    const fileContents = fs.readFileSync(dataFilePath, 'utf8');
-    const agentes = JSON.parse(fileContents);
+    const agentes = await listarNomes(tabelaAgentes);
     return NextResponse.json({ sucesso: true, agentes });
   } catch (error) {
-    return NextResponse.json({ sucesso: false, erro: 'Erro ao ler agentes' }, { status: 500 });
+    return respostaDeErro(error, 'Erro ao ler agentes');
   }
 }
 
 export async function POST(request: Request) {
   try {
     const { agentes } = await request.json();
-    fs.writeFileSync(dataFilePath, JSON.stringify(agentes, null, 2), 'utf8');
+    await substituirLista(tabelaAgentes, agentes);
     return NextResponse.json({ sucesso: true });
   } catch (error) {
-    return NextResponse.json({ sucesso: false, erro: 'Erro ao salvar agentes' }, { status: 500 });
+    return respostaDeErro(error, 'Erro ao salvar agentes');
   }
 }

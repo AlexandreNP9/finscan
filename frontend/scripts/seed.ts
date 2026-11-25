@@ -1,0 +1,61 @@
+// Importa os dados antigos de data/*.json para o Postgres (uso único).
+// Uso: pnpm db:seed   (requer DATABASE_URL e as migrations já aplicadas)
+//
+// Categorias e agentes são mesclados (nomes existentes são mantidos). Transações só são
+// importadas se a tabela estiver vazia, para o script não duplicar dados se rodar de novo.
+import './carregar-env';
+import fs from 'node:fs';
+import path from 'node:path';
+import { sql } from 'drizzle-orm';
+import { db } from '../lib/db';
+import { agentes, categorias, transacoes } from '../lib/db/schema';
+import { criarTransacao } from '../lib/db/repositorio';
+
+function lerJson<T>(arquivo: string): T {
+  return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', arquivo), 'utf8'));
+}
+
+async function main() {
+  const nomesCategorias = lerJson<string[]>('categorias.json');
+  const nomesAgentes = lerJson<string[]>('agentes.json');
+  const transacoesJson = lerJson<Record<string, unknown>[]>('transacoes.json');
+
+  // Os itens já salvos podem referenciar categorias/agentes que foram removidos das listas;
+  // eles são adicionados ao final para não perder a informação.
+  const categoriasUsadas = transacoesJson.flatMap((t) =>
+    ((t.items as { categoria?: string }[]) ?? []).map((i) => i.categoria ?? ''),
+  );
+  const agentesUsados = transacoesJson.map((t) => String(t.agenteOrigem ?? ''));
+  const todasCategorias = [...new Set([...nomesCategorias, ...categoriasUsadas].map((n) => n.trim()).filter(Boolean))];
+  const todosAgentes = [...new Set([...nomesAgentes, ...agentesUsados].map((n) => n.trim()).filter(Boolean))];
+
+  await db
+    .insert(categorias)
+    .values(todasCategorias.map((nome, ordem) => ({ nome, ordem })))
+    .onConflictDoNothing({ target: categorias.nome });
+  await db
+    .insert(agentes)
+    .values(todosAgentes.map((nome, ordem) => ({ nome, ordem })))
+    .onConflictDoNothing({ target: agentes.nome });
+  console.log(`Categorias: ${todasCategorias.length}, agentes: ${todosAgentes.length}`);
+
+  const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(transacoes);
+  if (total > 0) {
+    console.log(`Tabela transacoes já tem ${total} registro(s); transações não foram importadas.`);
+    return;
+  }
+
+  // O JSON guarda a mais recente primeiro; inserimos de trás para frente para manter a mesma ordem
+  // (a API lista por id decrescente).
+  for (const t of [...transacoesJson].reverse()) {
+    await criarTransacao(t);
+  }
+  console.log(`Transações importadas: ${transacoesJson.length}`);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((erro) => {
+    console.error(erro);
+    process.exit(1);
+  });

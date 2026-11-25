@@ -29,6 +29,7 @@ A partir desse projeto, espera-se oferecer uma visão completa e detalhada da sa
 ### Backend
 *    Rotas de API: Next.js Route Handlers (`/api/sefaz`).
 *    Extração de Dados: Cheerio (Faz o parsing do HTML da SEFAZ no lado do servidor, contornando bloqueios de CORS e extraindo itens via seletores CSS específicos).
+*    Banco de Dados: PostgreSQL 16, acessado via Drizzle ORM (schema em `frontend/lib/db/schema.ts`, migrations em `frontend/drizzle/`).
 
 ### Infraestrutura e DevOps
 *    Gerenciador de Pacotes: `pnpm`
@@ -44,6 +45,28 @@ docker-compose up --build -d
 ```
 
 Pode ser que precise usar o ```sudo``` no Linux
+
+O compose sobe também o PostgreSQL (porta `5433` no host) e o container do app aplica as migrations automaticamente ao iniciar.
+
+### Importe os dados antigos (apenas uma vez)
+Para levar as transações, categorias e agentes de `frontend/data/*.json` para o banco:
+```bash
+docker-compose exec finance-web pnpm db:seed
+```
+
+### Rodando sem Docker (desenvolvimento)
+Com um PostgreSQL acessível (ex.: só o serviço `db` do compose, via `docker-compose up -d db`), defina `DATABASE_URL` no `frontend/.env`, junto com a `GEMINI_API_KEY`:
+```bash
+DATABASE_URL=postgresql://finscan:finscan@localhost:5433/finscan
+```
+E então:
+```bash
+pnpm install
+pnpm db:migrate   # aplica as migrations
+pnpm db:seed      # opcional: importa data/*.json
+pnpm dev
+```
+Ao alterar `frontend/lib/db/schema.ts`, gere uma nova migration com `pnpm db:generate`.
 
 ### Acesse a aplicação
 * No computador, acessar no 

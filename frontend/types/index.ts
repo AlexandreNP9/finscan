@@ -8,3 +8,15 @@ export interface Item {
   vlTotal: string
   categoria: string
 }
+
+export interface Transacao {
+  id: number
+  chaveAcesso: string
+  valorTotal: string
+  desconto: string
+  estabelecimento: string
+  dataEmissao: string
+  horaEmissao: string
+  agenteOrigem: string
+  items: Item[]
+}

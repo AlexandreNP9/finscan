@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import categoriasCadastradas from '../../../data/categorias.json';
+import { categorias } from '../../../lib/db/schema';
+import { listarNomes } from '../../../lib/db/repositorio';
 
 // Inicializa o SDK com a sua chave do .env
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -12,6 +13,9 @@ export async function POST(request: Request) {
         if (!itens || itens.length === 0) {
             return NextResponse.json({ error: 'Nenhum item enviado' }, { status: 400 });
         }
+
+        // Lidas do banco a cada chamada, para refletir edições feitas em /categorias.
+        const categoriasCadastradas = await listarNomes(categorias);
 
         // Inicialização otimizada para velocidade e precisão
         const model = genAI.getGenerativeModel({
@@ -42,7 +46,7 @@ export async function POST(request: Request) {
 
         // Limpa a resposta caso a IA mande as crases do Markdown (```json ... ```)
         const jsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const categoriasSugeridas = JSON.parse(result.response.text());
+        const categoriasSugeridas = JSON.parse(jsonString);
 
         return NextResponse.json({ sucesso: true, resultado: categoriasSugeridas });
 

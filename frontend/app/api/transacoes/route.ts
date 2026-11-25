@@ -1,52 +1,35 @@
-import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const dataFilePath = path.join(process.cwd(), 'data', 'transacoes.json');
+import { NextResponse, connection } from 'next/server';
+import { atualizarTransacao, criarTransacao, listarTransacoes } from '../../../lib/db/repositorio';
+import { respostaDeErro } from '../../../lib/api';
 
 export async function GET() {
+  // Evita que o GET seja pré-renderizado no build (cacheComponents) e tente acessar o banco.
+  await connection();
   try {
-    if (!fs.existsSync(dataFilePath)) fs.writeFileSync(dataFilePath, JSON.stringify([]), 'utf8');
-    const fileContents = fs.readFileSync(dataFilePath, 'utf8');
-    return NextResponse.json({ sucesso: true, transacoes: JSON.parse(fileContents) });
+    const transacoes = await listarTransacoes();
+    return NextResponse.json({ sucesso: true, transacoes });
   } catch (error) {
-    return NextResponse.json({ sucesso: false }, { status: 500 });
+    return respostaDeErro(error, 'Erro ao ler transações');
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const novaTransacao = await request.json();
-    
-    if (!fs.existsSync(dataFilePath)) fs.writeFileSync(dataFilePath, JSON.stringify([]), 'utf8');
-    const fileContents = fs.readFileSync(dataFilePath, 'utf8');
-    const transacoes = JSON.parse(fileContents);
-    
-    // Adiciona um ID único (timestamp) e coloca no início da lista
-    const transacaoComId = { id: Date.now(), ...novaTransacao };
-    transacoes.unshift(transacaoComId);
-    
-    fs.writeFileSync(dataFilePath, JSON.stringify(transacoes, null, 2), 'utf8');
-    return NextResponse.json({ sucesso: true, id: transacaoComId.id });
+    const id = await criarTransacao(await request.json());
+    return NextResponse.json({ sucesso: true, id });
   } catch (error) {
-    return NextResponse.json({ sucesso: false }, { status: 500 });
+    return respostaDeErro(error, 'Erro ao salvar transação');
   }
 }
 
 export async function PUT(request: Request) {
   try {
-    const transacaoAtualizada = await request.json();
-    const fileContents = fs.readFileSync(dataFilePath, 'utf8');
-    let transacoes = JSON.parse(fileContents);
-
-    // Encontra a transação pelo ID e substitui pelos dados novos
-    transacoes = transacoes.map((t: any) => 
-      t.id === transacaoAtualizada.id ? transacaoAtualizada : t
-    );
-
-    fs.writeFileSync(dataFilePath, JSON.stringify(transacoes, null, 2), 'utf8');
+    const encontrada = await atualizarTransacao(await request.json());
+    if (!encontrada) {
+      return NextResponse.json({ sucesso: false, erro: 'Transação não encontrada' }, { status: 404 });
+    }
     return NextResponse.json({ sucesso: true });
   } catch (error) {
-    return NextResponse.json({ sucesso: false, erro: 'Erro ao atualizar' }, { status: 500 });
+    return respostaDeErro(error, 'Erro ao atualizar');
   }
 }

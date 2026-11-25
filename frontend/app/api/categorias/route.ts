@@ -1,29 +1,25 @@
-import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-// Aponta exatamente para o seu arquivo JSON na raiz do frontend
-const dataFilePath = path.join(process.cwd(), 'data', 'categorias.json');
+import { NextResponse, connection } from 'next/server';
+import { categorias as tabelaCategorias } from '../../../lib/db/schema';
+import { listarNomes, substituirLista } from '../../../lib/db/repositorio';
+import { respostaDeErro } from '../../../lib/api';
 
 export async function GET() {
+  // Evita que o GET seja pré-renderizado no build (cacheComponents) e tente acessar o banco.
+  await connection();
   try {
-    const fileContents = fs.readFileSync(dataFilePath, 'utf8');
-    const categorias = JSON.parse(fileContents);
+    const categorias = await listarNomes(tabelaCategorias);
     return NextResponse.json({ sucesso: true, categorias });
   } catch (error) {
-    return NextResponse.json({ sucesso: false, erro: 'Erro ao ler categorias' }, { status: 500 });
+    return respostaDeErro(error, 'Erro ao ler categorias');
   }
 }
 
 export async function POST(request: Request) {
   try {
     const { categorias } = await request.json();
-    
-    // Sobrescreve o JSON formatado com 2 espaços para ficar bonito no arquivo
-    fs.writeFileSync(dataFilePath, JSON.stringify(categorias, null, 2), 'utf8');
-    
+    await substituirLista(tabelaCategorias, categorias);
     return NextResponse.json({ sucesso: true });
   } catch (error) {
-    return NextResponse.json({ sucesso: false, erro: 'Erro ao salvar categorias' }, { status: 500 });
+    return respostaDeErro(error, 'Erro ao salvar categorias');
   }
 }

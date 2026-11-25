@@ -54,7 +54,8 @@ export default function FormularioAuth({ modo }: { modo: Modo }) {
         return;
       }
       // Navegação completa para o proxy já enxergar o cookie novo.
-      window.location.replace(destinoPosLogin());
+      // Conta nova vai para o onboarding; login volta para onde o usuário estava.
+      window.location.replace(modo === 'cadastro' ? '/boas-vindas' : destinoPosLogin());
     } catch {
       setErro('Erro de conexão.');
     } finally {

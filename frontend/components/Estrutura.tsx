@@ -58,9 +58,11 @@ export default function Estrutura({ children, pendentes, semNavInferior }: Props
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
-            <Link href="/nova-transacao" className={classeBotao('primario', 'hidden md:inline-flex')}>
-              <PlusIcon /> Registrar compra
-            </Link>
+            <div className="hidden md:block">
+              <Link href="/nova-transacao" className={classeBotao('primario')}>
+                <PlusIcon /> Registrar compra
+              </Link>
+            </div>
             <MenuUsuario />
           </div>
         </div>

@@ -13,6 +13,30 @@ export const agentes = pgTable('agentes', {
   ordem: integer('ordem').notNull().default(0),
 });
 
+// Contas de acesso. `email` é gravado normalizado (minúsculas, sem espaços); `senhaHash` é bcrypt.
+export const usuarios = pgTable('usuarios', {
+  id: serial('id').primaryKey(),
+  nome: text('nome').notNull(),
+  email: text('email').notNull().unique(),
+  senhaHash: text('senha_hash').notNull(),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Sessões de login. O cookie guarda o token aleatório; aqui fica só o SHA-256 dele.
+export const sessoes = pgTable(
+  'sessoes',
+  {
+    id: serial('id').primaryKey(),
+    tokenHash: text('token_hash').notNull().unique(),
+    usuarioId: integer('usuario_id')
+      .notNull()
+      .references(() => usuarios.id, { onDelete: 'cascade' }),
+    expiraEm: timestamp('expira_em', { withTimezone: true }).notNull(),
+    criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('sessoes_usuario_id_idx').on(t.usuarioId)],
+);
+
 export const transacoes = pgTable('transacoes', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   chaveAcesso: text('chave_acesso'),
@@ -23,8 +47,11 @@ export const transacoes = pgTable('transacoes', {
   horaEmissao: time('hora_emissao'),
   // Remover um agente da lista não apaga as transações; elas ficam sem agente.
   agenteId: integer('agente_id').references(() => agentes.id, { onDelete: 'set null' }),
+  // Quem registrou a transação; cada usuário só enxerga as suas. Null = transação anterior à
+  // autenticação, ainda não atribuída (ver `pnpm db:atribuir`).
+  usuarioId: integer('usuario_id').references(() => usuarios.id, { onDelete: 'set null' }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [index('transacoes_usuario_id_idx').on(t.usuarioId)]);
 
 export const itens = pgTable(
   'itens',

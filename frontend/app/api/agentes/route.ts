@@ -2,11 +2,13 @@ import { NextResponse, connection } from 'next/server';
 import { agentes as tabelaAgentes } from '../../../lib/db/schema';
 import { listarNomes, substituirLista } from '../../../lib/db/repositorio';
 import { respostaDeErro } from '../../../lib/api';
+import { exigirUsuario } from '../../../lib/auth';
 
 export async function GET() {
   // Evita que o GET seja pré-renderizado no build (cacheComponents) e tente acessar o banco.
   await connection();
   try {
+    await exigirUsuario();
     const agentes = await listarNomes(tabelaAgentes);
     return NextResponse.json({ sucesso: true, agentes });
   } catch (error) {
@@ -16,6 +18,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    await exigirUsuario();
     const { agentes } = await request.json();
     await substituirLista(tabelaAgentes, agentes);
     return NextResponse.json({ sucesso: true });

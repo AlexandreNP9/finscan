@@ -23,7 +23,8 @@ pnpm build      # production build (also the type-check)
 pnpm lint       # eslint (next core-web-vitals + typescript configs)
 pnpm db:generate  # generate a SQL migration in drizzle/ after editing lib/db/schema.ts
 pnpm db:migrate   # apply pending migrations (also run automatically by the Docker CMD)
-pnpm db:seed      # one-time import of data/*.json into Postgres (skips transactions if table non-empty)
+pnpm db:seed [email]   # one-time import of data/*.json into Postgres (skips transactions if table non-empty); with email, imported transactions belong to that user
+pnpm db:atribuir <email>  # assign transactions with no owner (pre-auth data) to an existing user
 pnpm db:studio    # Drizzle Studio
 docker-compose up --build -d   # app + Postgres (db exposed on host port 5433)
 docker-compose up -d db        # only Postgres, for running `pnpm dev` locally
@@ -38,7 +39,7 @@ Environment (`frontend/.env`, gitignored): `GEMINI_API_KEY` (required by `/api/c
 
 ## Architecture
 
-**Persistence is PostgreSQL via Drizzle ORM** (`frontend/lib/db/`): `schema.ts` (tables `categorias`, `agentes`, `transacoes`, `itens`), `index.ts` (pooled `db` client, cached on `globalThis` in dev), and `repositorio.ts`, the only place route handlers should touch the DB. Migrations live in `frontend/drizzle/` and are generated from the schema — never hand-edit applied migrations.
+**Persistence is PostgreSQL via Drizzle ORM** (`frontend/lib/db/`): `schema.ts` (tables `usuarios`, `sessoes`, `categorias`, `agentes`, `transacoes`, `itens`), `index.ts` (pooled `db` client, cached on `globalThis` in dev), and `repositorio.ts`, the only place route handlers should touch the DB. Migrations live in `frontend/drizzle/` and are generated from the schema — never hand-edit applied migrations.
 
 The repository layer **keeps the API contract from the JSON-file era** so pages didn't change: money/quantities go out as Brazilian-formatted strings (`"1234,50"`, `"0,308"`; no thousands separator), items reference categories by **name** with `categoria: ''` meaning "not yet categorized" (`categoria_id` NULL), and transactions reference the payment source by name (`agenteOrigem`). `formato.ts` does the BR string ↔ `numeric` conversion; numeric columns come back from `pg` as strings, so don't use JS floats for storage. Unknown category/agent names or malformed values throw `ErroValidacao`, which `lib/api.ts` turns into a 400.
 
@@ -50,12 +51,18 @@ Because `next.config.ts` enables `cacheComponents`, `GET` route handlers can be 
 
 API routes (`frontend/app/api/*/route.ts`) return `{ sucesso: boolean, ... }`. `categorias` and `agentes` POST replace the whole array; `transacoes` supports GET (newest first) / POST / PUT (by `id`; items whose `id` belongs to the transaction are updated, others inserted, missing ones deleted).
 
+**Authentication** (`lib/auth.ts`, `server-only`): email + password (bcryptjs, cost 12; pure JS because the Dockerfile installs with `--ignore-scripts`). Sessions live in the `sessoes` table: the HTTP-only cookie `finscan_sessao` holds a random token and the DB stores only its SHA-256, so no secret env var is needed and logout revokes the session. The cookie is `secure` only when `x-forwarded-proto` is https (so plain `http://localhost` in Docker works). Two layers:
+- `proxy.ts` (Next 16's replacement for `middleware`) only checks that the cookie exists: pages redirect to `/login?proximo=…`, `/api/*` returns 401; it also rejects non-GET API requests whose `Origin` host differs (CSRF). Public: `/login`, `/cadastro`, `/api/auth/login`, `/api/auth/cadastro`. It can't import `lib/auth.ts`, so the cookie name is duplicated there.
+- Every API route handler calls `exigirUsuario()` (validates the session in the DB; throws `ErroNaoAutenticado` → 401 via `respostaDeErro`). Handlers with their own error format use `bloquearSemLogin()` from `lib/api.ts`. An invalid/expired session cookie is deleted so the proxy doesn't loop `/login` → `/`.
+
+**Transactions are per user**: `transacoes.usuario_id` (nullable for legacy rows). `listarTransacoes`/`criarTransacao`/`atualizarTransacao` take the user id; updating another user's transaction is a 404. Categories and agents stay global (shared). Each transaction carries `usuario` (name of who registered it). Rows with `usuario_id` NULL are invisible until `pnpm db:atribuir <email>`. Auth routes: `/api/auth/{cadastro,login,logout,sessao}`. Pages call the API through `buscarApi()` (`lib/cliente.ts`), which sends the browser to `/login` on a 401; `/login` and `/cadastro` share `components/FormularioAuth.tsx`; `components/UsuarioLogado.tsx` shows the logged-in user + logout on the dashboard. `scripts/` must not import `lib/auth.ts` (`server-only` throws outside Next).
+
 **Receipt capture flow** (`app/nova-transacao/page.tsx`, a multi-step wizard driven by an `etapa` state):
 1. Capture: either scan the NFC-e QR code (`@yudiel/react-qr-scanner`) → `POST /api/sefaz` with the URL, which fetches the SEFAZ page server-side (avoids CORS) and parses it with Cheerio; or paste the raw SEFAZ HTML → `POST /api/sefaz-html`. The two parsers use slightly different selectors (`.txtTit2` vs `.txtTit`, etc.) since they target different page variants — keep them in sync when changing extracted fields.
 2. Review the extracted header/items, pick `agenteOrigem`, save via `POST /api/transacoes`. Items are saved with `categoria: ''`.
 
 **Categorization** (`app/categorizar/page.tsx`): lists transactions with any item where `categoria === ''`, sends items to `POST /api/categorizar` (Gemini via `@google/generative-ai`, JSON response mode, prompt built from the categories currently in the DB, returns `[{ id, descricaoLimpa, categoria }]`), lets the user review, then persists with `PUT /api/transacoes`.
 
-Other pages: `/` (dashboard), `/historico`, `/categorias` and `/agentes` (editors for the category and payment-source lists). All pages are client components (`"use client"`) fetching the API routes; there's no shared state/store. Shared inline-SVG icons are in `components/icons/index.tsx`. Styling is Tailwind with hard-coded hex colors in class names.
+Other pages: `/` (dashboard), `/historico`, `/login`, `/cadastro`, `/categorias` and `/agentes` (editors for the category and payment-source lists). All pages are client components (`"use client"`) fetching the API routes via `buscarApi`; there's no shared state/store. Shared inline-SVG icons are in `components/icons/index.tsx`. Styling is Tailwind with hard-coded hex colors in class names.
 
 On the client, monetary values and quantities are **Brazilian-formatted strings** (e.g. `"31,81"`, `"0,308"`), not numbers — convert explicitly when doing arithmetic.

@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { categorias } from '../../../lib/db/schema';
 import { listarNomes } from '../../../lib/db/repositorio';
+import { bloquearSemLogin } from '../../../lib/api';
 
 // Inicializa o SDK com a sua chave do .env
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(request: Request) {
+    const semLogin = await bloquearSemLogin();
+    if (semLogin) return semLogin;
+
     try {
         const { itens } = await request.json();
 

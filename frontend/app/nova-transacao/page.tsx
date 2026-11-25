@@ -6,6 +6,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 
 import { Item } from '../../types';
 import { CameraIcon, KeyboardIcon, BackIcon, CodeIcon } from '../../components/icons';
+import { buscarApi } from '../../lib/cliente';
 
 const inp = 'w-full border border-[#e2e5ea] rounded-lg bg-white text-[#111827] text-sm px-3 py-2.5 outline-none transition-all focus:border-[#1d4ed8] placeholder-[#9ca3af]';
 const lbl = 'block text-[10px] font-semibold text-[#6b7280] mb-1 tracking-widest uppercase';
@@ -36,7 +37,7 @@ export default function NovaTransacao() {
   const [listaAgentes, setListaAgentes] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch('/api/agentes').then(res => res.json()).then(data => {
+    buscarApi('/api/agentes').then(res => res.json()).then(data => {
       if (data.sucesso) setListaAgentes(data.agentes);
     });
   }, []);
@@ -44,7 +45,7 @@ export default function NovaTransacao() {
   const processarSefazURL = async (urlConsulta: string) => {
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/sefaz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: urlConsulta }) });
+      const res = await buscarApi('/api/sefaz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: urlConsulta }) });
       const data = await res.json();
       aplicarDadosExtraidos(data);
     } catch (e) {
@@ -56,7 +57,7 @@ export default function NovaTransacao() {
     if (htmlInput.length < 50) { alert("Cole o código ou selecione um arquivo válido."); return; }
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/sefaz-html', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ htmlBruto: htmlInput }) });
+      const res = await buscarApi('/api/sefaz-html', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ htmlBruto: htmlInput }) });
       const data = await res.json();
       if (!data.sucesso) {
         alert(data.erro || 'Falha ao ler os dados do texto colado.');
@@ -93,7 +94,7 @@ export default function NovaTransacao() {
     const payload = { chaveAcesso, valorTotal, desconto, estabelecimento: estabelecimentoNota, dataEmissao, horaEmissao, agenteOrigem, items };
 
     try {
-      const res = await fetch('/api/transacoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await buscarApi('/api/transacoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) router.push('/');
       else { alert('Erro ao salvar.'); setIsSaving(false); }
     } catch (e) { alert('Erro de conexão.'); setIsSaving(false); }

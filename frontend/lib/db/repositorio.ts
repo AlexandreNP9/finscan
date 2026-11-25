@@ -1,6 +1,6 @@
-import { asc, desc, eq, getTableColumns, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gt, inArray, isNull, lte, notInArray, sql } from 'drizzle-orm';
 import { db, type Db } from './index';
-import { agentes, categorias, itens, transacoes } from './schema';
+import { agentes, categorias, itens, sessoes, transacoes, usuarios } from './schema';
 import { brParaNumeric, ErroValidacao, numericParaBr, validarData, validarHora } from './formato';
 import type { Item, Transacao } from '../../types';
 
@@ -43,17 +43,22 @@ export async function substituirLista(tabela: TabelaLista, nomes: unknown): Prom
 
 // ---------- Transações ----------
 
-export async function listarTransacoes(): Promise<Transacao[]> {
+/** Transações do usuário (as mais recentes primeiro). */
+export async function listarTransacoes(usuarioId: number): Promise<Transacao[]> {
   const cabecalhos = await db
-    .select({ ...getTableColumns(transacoes), agente: agentes.nome })
+    .select({ ...getTableColumns(transacoes), agente: agentes.nome, usuario: usuarios.nome })
     .from(transacoes)
     .leftJoin(agentes, eq(transacoes.agenteId, agentes.id))
+    .leftJoin(usuarios, eq(transacoes.usuarioId, usuarios.id))
+    .where(eq(transacoes.usuarioId, usuarioId))
     .orderBy(desc(transacoes.id));
 
   const linhasItens = await db
     .select({ ...getTableColumns(itens), categoria: categorias.nome })
     .from(itens)
+    .innerJoin(transacoes, eq(itens.transacaoId, transacoes.id))
     .leftJoin(categorias, eq(itens.categoriaId, categorias.id))
+    .where(eq(transacoes.usuarioId, usuarioId))
     .orderBy(asc(itens.transacaoId), asc(itens.ordem), asc(itens.id));
 
   const itensPorTransacao = new Map<number, Item[]>();
@@ -81,18 +86,22 @@ export async function listarTransacoes(): Promise<Transacao[]> {
     dataEmissao: t.dataEmissao ?? '',
     horaEmissao: t.horaEmissao ? t.horaEmissao.slice(0, 5) : '',
     agenteOrigem: t.agente ?? '',
+    usuario: t.usuario ?? '',
     items: itensPorTransacao.get(t.id) ?? [],
   }));
 }
 
-/** Insere uma transação vinda da UI. Ids de itens enviados pelo cliente são ignorados. */
-export async function criarTransacao(payload: unknown): Promise<number> {
+/**
+ * Insere uma transação vinda da UI, registrada por `usuarioId` (null só no seed sem usuário).
+ * Ids de itens enviados pelo cliente são ignorados.
+ */
+export async function criarTransacao(payload: unknown, usuarioId: number | null): Promise<number> {
   const p = exigirObjeto(payload, 'transação');
   const itensEntrada = exigirItens(p.items);
 
   return db.transaction(async (tx) => {
     const cabecalho = await lerCabecalho(tx, p);
-    const [{ id }] = await tx.insert(transacoes).values(cabecalho).returning({ id: transacoes.id });
+    const [{ id }] = await tx.insert(transacoes).values({ ...cabecalho, usuarioId }).returning({ id: transacoes.id });
     const categoriaIds = await resolverCategorias(tx, itensEntrada);
     if (itensEntrada.length > 0) {
       await tx.insert(itens).values(itensEntrada.map((i, ordem) => lerItem(i, ordem, id, categoriaIds)));
@@ -104,9 +113,9 @@ export async function criarTransacao(payload: unknown): Promise<number> {
 /**
  * Substitui cabeçalho e itens de uma transação existente. Itens cujo `id` já pertence à transação
  * são atualizados, os demais são inseridos e os que sumiram do payload são removidos.
- * Retorna false se a transação não existir.
+ * Retorna false se a transação não existir ou não pertencer a `usuarioId`.
  */
-export async function atualizarTransacao(payload: unknown): Promise<boolean> {
+export async function atualizarTransacao(payload: unknown, usuarioId: number): Promise<boolean> {
   const p = exigirObjeto(payload, 'transação');
   if (typeof p.id !== 'number') throw new ErroValidacao('Transação sem id.');
   const transacaoId = p.id;
@@ -117,7 +126,7 @@ export async function atualizarTransacao(payload: unknown): Promise<boolean> {
     const atualizadas = await tx
       .update(transacoes)
       .set(cabecalho)
-      .where(eq(transacoes.id, transacaoId))
+      .where(and(eq(transacoes.id, transacaoId), eq(transacoes.usuarioId, usuarioId)))
       .returning({ id: transacoes.id });
     if (atualizadas.length === 0) return false;
 
@@ -142,6 +151,67 @@ export async function atualizarTransacao(payload: unknown): Promise<boolean> {
     if (remover.length > 0) await tx.delete(itens).where(inArray(itens.id, remover));
     return true;
   });
+}
+
+/** Vincula as transações sem dono (anteriores à autenticação) ao usuário. Retorna quantas. */
+export async function atribuirTransacoesSemDono(usuarioId: number): Promise<number> {
+  const linhas = await db
+    .update(transacoes)
+    .set({ usuarioId })
+    .where(isNull(transacoes.usuarioId))
+    .returning({ id: transacoes.id });
+  return linhas.length;
+}
+
+// ---------- Usuários / Sessões ----------
+
+export type Usuario = { id: number; nome: string; email: string };
+
+export function normalizarEmail(valor: unknown): string {
+  return texto(valor).toLowerCase();
+}
+
+/** Cria a conta. `senhaHash` já vem calculado (lib/auth.ts); aqui só se valida nome e e-mail. */
+export async function criarUsuario(nome: unknown, email: unknown, senhaHash: string): Promise<Usuario> {
+  const nomeLimpo = texto(nome);
+  const emailLimpo = normalizarEmail(email);
+  if (!nomeLimpo) throw new ErroValidacao('Informe o nome.');
+  if (nomeLimpo.length > 100) throw new ErroValidacao('Nome muito longo.');
+  if (emailLimpo.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLimpo)) {
+    throw new ErroValidacao('E-mail inválido.');
+  }
+
+  const [criado] = await db
+    .insert(usuarios)
+    .values({ nome: nomeLimpo, email: emailLimpo, senhaHash })
+    .onConflictDoNothing({ target: usuarios.email })
+    .returning({ id: usuarios.id, nome: usuarios.nome, email: usuarios.email });
+  if (!criado) throw new ErroValidacao('E-mail já cadastrado.');
+  return criado;
+}
+
+export async function buscarUsuarioPorEmail(email: unknown) {
+  const [usuario] = await db.select().from(usuarios).where(eq(usuarios.email, normalizarEmail(email)));
+  return usuario ?? null;
+}
+
+export async function gravarSessao(tokenHash: string, usuarioId: number, expiraEm: Date): Promise<void> {
+  await db.delete(sessoes).where(lte(sessoes.expiraEm, new Date()));
+  await db.insert(sessoes).values({ tokenHash, usuarioId, expiraEm });
+}
+
+export async function apagarSessao(tokenHash: string): Promise<void> {
+  await db.delete(sessoes).where(eq(sessoes.tokenHash, tokenHash));
+}
+
+/** Usuário dono de uma sessão ainda válida, ou null. */
+export async function usuarioDaSessao(tokenHash: string): Promise<Usuario | null> {
+  const [linha] = await db
+    .select({ id: usuarios.id, nome: usuarios.nome, email: usuarios.email })
+    .from(sessoes)
+    .innerJoin(usuarios, eq(sessoes.usuarioId, usuarios.id))
+    .where(and(eq(sessoes.tokenHash, tokenHash), gt(sessoes.expiraEm, new Date())));
+  return linha ?? null;
 }
 
 // ---------- Helpers de entrada ----------

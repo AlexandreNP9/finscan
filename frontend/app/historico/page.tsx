@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { buscarApi } from '../../lib/cliente';
 import { BackIcon, ReceiptIcon } from '../../components/icons';
 import { Item } from '../../types';
 
@@ -11,7 +12,7 @@ export default function Historico() {
   const [expandidoId, setExpandidoId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch('/api/transacoes')
+    buscarApi('/api/transacoes')
       .then(res => res.json())
       .then(data => {
         if (data.sucesso) {
@@ -64,6 +65,7 @@ export default function Historico() {
                       <p className="text-[14px] font-bold text-[#111827]">{t.estabelecimento || 'Estabelecimento Desconhecido'}</p>
                       <p className="text-[11px] text-[#6b7280] mt-0.5">
                         {t.dataEmissao.split('-').reverse().join('/')} {t.horaEmissao && `às ${t.horaEmissao}`} • {t.agenteOrigem}
+                        {t.usuario && ` • Registrado por ${t.usuario}`}
                       </p>
                     </div>
                     <div className="text-right flex items-center gap-3">

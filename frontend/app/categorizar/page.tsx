@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { buscarApi } from '../../lib/cliente';
 import { BackIcon, SparkleIcon, RefreshIcon, WarningIcon } from '../../components/icons';
 import CATEGORIAS from '../../data/categorias.json';
 import { Item } from '../../types';
@@ -21,7 +22,7 @@ export default function CategorizarProdutos() {
 
   // Busca as transações do banco local
   const carregarTransacoes = () => {
-    fetch('/api/transacoes')
+    buscarApi('/api/transacoes')
       .then(res => res.json())
       .then(data => {
         if (data.sucesso) {
@@ -66,7 +67,7 @@ export default function CategorizarProdutos() {
     try {
       const itensSimplificados = transacaoAtiva.items.map((i: Item) => ({ id: i.id, descricao: i.descricao }));
 
-      const res = await fetch('/api/categorizar', {
+      const res = await buscarApi('/api/categorizar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itens: itensSimplificados }),
@@ -116,7 +117,7 @@ export default function CategorizarProdutos() {
 
     setIsSalvando(true);
     try {
-      const res = await fetch('/api/transacoes', {
+      const res = await buscarApi('/api/transacoes', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(transacaoAtiva)
@@ -181,7 +182,7 @@ export default function CategorizarProdutos() {
                     >
                       <div>
                         <p className="text-[14px] font-bold text-[#111827]">{t.estabelecimento || 'Estabelecimento Desconhecido'}</p>
-                        <p className="text-[11px] text-[#6b7280] mt-0.5">{t.dataEmissao.split('-').reverse().join('/')} • {t.agenteOrigem}</p>
+                        <p className="text-[11px] text-[#6b7280] mt-0.5">{t.dataEmissao.split('-').reverse().join('/')} • {t.agenteOrigem}{t.usuario && ` • Registrado por ${t.usuario}`}</p>
                         <div className="mt-2 inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-md">
                           <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
                           {qtdPendentes} iten(s) pendente(s)

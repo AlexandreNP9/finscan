@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { buscarApi } from '../../lib/cliente';
 import { TrashIcon, BackIcon, PlusIcon } from '../../components/icons';
 
 export default function GerenciarCategorias() {
@@ -13,7 +14,7 @@ export default function GerenciarCategorias() {
 
   // Carrega as categorias do JSON ao abrir a tela
   useEffect(() => {
-    fetch('/api/categorias')
+    buscarApi('/api/categorias')
       .then(res => res.json())
       .then(data => {
         if (data.sucesso) setCategorias(data.categorias);
@@ -47,7 +48,7 @@ export default function GerenciarCategorias() {
   const salvarNoServidor = async () => {
     setStatusSalvar('salvando');
     try {
-      const res = await fetch('/api/categorias', {
+      const res = await buscarApi('/api/categorias', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ categorias })

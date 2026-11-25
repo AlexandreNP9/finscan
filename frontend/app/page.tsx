@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { buscarApi } from '../lib/cliente';
+import UsuarioLogado from '../components/UsuarioLogado';
 
 // ── ÍCONES ──
 const ScanIcon = () => ( <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg> );
@@ -28,7 +30,7 @@ export default function Dashboard() {
   const [categoriaDetalhe, setCategoriaDetalhe] = useState<{ nome: string, total: number, cor: string } | null>(null);
 
   useEffect(() => {
-    fetch('/api/transacoes')
+    buscarApi('/api/transacoes')
       .then(res => res.json())
       .then(data => {
         if (data.sucesso) {
@@ -109,7 +111,11 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#f4f5f7] p-4 md:p-8 flex justify-center">
       <div className="w-full max-w-[430px] md:max-w-[960px] flex flex-col gap-6 pb-8 relative">
         
-        <header className="pt-4 flex items-center justify-between">
+        <div className="pt-4 flex items-center justify-end">
+          <UsuarioLogado />
+        </div>
+
+        <header className="flex items-center justify-between">
           <div>
             <h1 className="text-[22px] font-bold text-[#111827]">Visão Geral</h1>
             <p className="text-[13px] text-[#6b7280] capitalize">{mesSelecionado ? nomeMes(mesSelecionado) : 'Carregando...'}</p>

@@ -18,5 +18,7 @@ export interface Transacao {
   dataEmissao: string
   horaEmissao: string
   agenteOrigem: string
+  /** Nome de quem registrou a transação ('' se ainda não atribuída). */
+  usuario: string
   items: Item[]
 }

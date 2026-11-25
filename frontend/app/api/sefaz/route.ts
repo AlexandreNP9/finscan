@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { bloquearSemLogin } from '../../../lib/api';
 
 export async function POST(request: Request) {
+  const semLogin = await bloquearSemLogin();
+  if (semLogin) return semLogin;
+
   try {
     const { url } = await request.json();
     if (!url) return NextResponse.json({ error: 'URL não fornecida' }, { status: 400 });

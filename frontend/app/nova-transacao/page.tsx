@@ -6,6 +6,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 
 import { Item } from '../../types';
 import { CameraIcon, KeyboardIcon, BackIcon, CodeIcon } from '../../components/icons';
+import { buscarApi } from '../../lib/cliente';
 
 const inp = 'w-full border border-[#e2e5ea] rounded-lg bg-white text-[#111827] text-sm px-3 py-2.5 outline-none transition-all focus:border-[#1d4ed8] placeholder-[#9ca3af]';
 const lbl = 'block text-[10px] font-semibold text-[#6b7280] mb-1 tracking-widest uppercase';
@@ -34,17 +35,26 @@ export default function NovaTransacao() {
   const [agenteOrigem, setAgenteOrigem] = useState('');
   
   const [listaAgentes, setListaAgentes] = useState<string[]>([]);
+  const [agentesCarregados, setAgentesCarregados] = useState(false);
 
   useEffect(() => {
-    fetch('/api/agentes').then(res => res.json()).then(data => {
-      if (data.sucesso) setListaAgentes(data.agentes);
-    });
+    const carregarAgentes = () => {
+      buscarApi('/api/agentes').then(res => res.json()).then(data => {
+        if (data.sucesso) setListaAgentes(data.agentes);
+        setAgentesCarregados(true);
+      });
+    };
+    carregarAgentes();
+    // O aviso de "nenhum agente" abre /agentes em outra aba; ao voltar, a lista é recarregada
+    // sem perder a nota já lida nesta tela.
+    window.addEventListener('focus', carregarAgentes);
+    return () => window.removeEventListener('focus', carregarAgentes);
   }, []);
 
   const processarSefazURL = async (urlConsulta: string) => {
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/sefaz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: urlConsulta }) });
+      const res = await buscarApi('/api/sefaz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: urlConsulta }) });
       const data = await res.json();
       aplicarDadosExtraidos(data);
     } catch (e) {
@@ -56,7 +66,7 @@ export default function NovaTransacao() {
     if (htmlInput.length < 50) { alert("Cole o código ou selecione um arquivo válido."); return; }
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/sefaz-html', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ htmlBruto: htmlInput }) });
+      const res = await buscarApi('/api/sefaz-html', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ htmlBruto: htmlInput }) });
       const data = await res.json();
       if (!data.sucesso) {
         alert(data.erro || 'Falha ao ler os dados do texto colado.');
@@ -93,7 +103,7 @@ export default function NovaTransacao() {
     const payload = { chaveAcesso, valorTotal, desconto, estabelecimento: estabelecimentoNota, dataEmissao, horaEmissao, agenteOrigem, items };
 
     try {
-      const res = await fetch('/api/transacoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await buscarApi('/api/transacoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) router.push('/');
       else { alert('Erro ao salvar.'); setIsSaving(false); }
     } catch (e) { alert('Erro de conexão.'); setIsSaving(false); }
@@ -240,6 +250,15 @@ export default function NovaTransacao() {
                       </select>
                       <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                     </div>
+                    {agentesCarregados && listaAgentes.length === 0 && (
+                      <p className="mt-2 text-[12px] text-[#92400e] bg-[#fffbeb] border border-[#fde68a] rounded-lg px-3 py-2">
+                        Você ainda não cadastrou nenhuma conta ou cartão.{' '}
+                        <a href="/agentes" target="_blank" rel="noopener" className="font-semibold text-[#1d4ed8] underline">
+                          Cadastrar agora
+                        </a>{' '}
+                        (abre em outra aba; ao voltar, a lista é atualizada).
+                      </p>
+                    )}
                   </div>
 
                   <div className="bg-white rounded-xl border border-[#e8eaed] p-4 space-y-3.5 opacity-80 pointer-events-none">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { buscarApi } from '../../lib/cliente';
 import { TrashIcon, BackIcon, PlusIcon, WalletIcon } from '../../components/icons';
 
 export default function GerenciarAgentes() {
@@ -11,7 +12,7 @@ export default function GerenciarAgentes() {
   const [statusSalvar, setStatusSalvar] = useState<'idle' | 'salvando' | 'sucesso' | 'erro'>('idle');
 
   useEffect(() => {
-    fetch('/api/agentes')
+    buscarApi('/api/agentes')
       .then(res => res.json())
       .then(data => {
         if (data.sucesso) setAgentes(data.agentes);
@@ -43,7 +44,7 @@ export default function GerenciarAgentes() {
   const salvarNoServidor = async () => {
     setStatusSalvar('salvando');
     try {
-      const res = await fetch('/api/agentes', {
+      const res = await buscarApi('/api/agentes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agentes })

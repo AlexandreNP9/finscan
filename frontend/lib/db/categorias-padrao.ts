@@ -1,0 +1,25 @@
+// Categorias criadas para cada conta nova (em `criarUsuario`), para o usuário já poder categorizar.
+// Ele pode editar a lista depois em /categorias.
+export const CATEGORIAS_PADRAO = [
+  'Mercearia Básica',
+  'Hortifruti',
+  'Açougue e Peixaria',
+  'Frios e Laticínios',
+  'Padaria e Confeitaria',
+  'Congelados',
+  'Lanches e Doces',
+  'Bebidas Não Alcoólicas',
+  'Bebidas Alcoólicas',
+  'Higiene Pessoal',
+  'Cuidados Pessoais e Beleza',
+  'Limpeza da Casa',
+  'Bebês e Crianças',
+  'Pet Shop',
+  'Utilidades Domésticas',
+  'Bazar e Manutenção',
+  'Farmácia e Saúde',
+  'Papelaria',
+  'Automotivo',
+  'Vestuário',
+  'Outros',
+];

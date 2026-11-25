@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { bloquearSemLogin } from '../../../lib/api';
 
 export async function POST(request: Request) {
+  const semLogin = await bloquearSemLogin();
+  if (semLogin) return semLogin;
+
   try {
     const { htmlBruto } = await request.json();
     if (!htmlBruto) return NextResponse.json({ sucesso: false, erro: 'Nenhum código fornecido.' }, { status: 400 });

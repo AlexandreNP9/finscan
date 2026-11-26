@@ -10,7 +10,7 @@ The whole app lives in `frontend/` (a single Next.js app serving both UI and API
 
 ## Important: Next.js version
 
-`frontend/AGENTS.md` applies: this is Next.js 16 with breaking changes versus older versions. Before writing Next.js-specific code, read the relevant guide in `frontend/node_modules/next/dist/docs/` and heed deprecation notices. `next.config.ts` enables `cacheComponents`, `partialPrefetching`, and experimental `agentFeedback`/`agentUpgrade`; Tailwind v4 is wired through a Turbopack CSS loader rule rather than PostCSS.
+`frontend/AGENTS.md` applies: this is Next.js 16 with breaking changes versus older versions. Before writing Next.js-specific code, read the relevant guide in `frontend/node_modules/next/dist/docs/` and heed deprecation notices. `next.config.ts` enables `cacheComponents`, `partialPrefetching`, and experimental `agentUpgrade` (`agentFeedback` was turned off on purpose: it made `next dev` rewrite `AGENTS.md`); Tailwind v4 is wired through a Turbopack CSS loader rule rather than PostCSS.
 
 ## Commands
 

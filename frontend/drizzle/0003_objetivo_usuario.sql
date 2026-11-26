@@ -1,0 +1,1 @@
+ALTER TABLE "usuarios" ADD COLUMN "objetivo" text DEFAULT '' NOT NULL;

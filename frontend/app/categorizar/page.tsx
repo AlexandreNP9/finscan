@@ -7,9 +7,8 @@ import Estrutura from '../../components/Estrutura';
 import Aviso from '../../components/Aviso';
 import Botao, { LinkBotao, Spinner } from '../../components/Botao';
 import { BackIcon, ChevronIcon, SparkleIcon } from '../../components/icons';
-import type { Item, Transacao } from '../../types';
-
-type Sugestao = { id: number; categoria: string };
+import type { Item, SugestaoItem, Transacao } from '../../types';
+import SugestoesNovas, { type SugestaoNova } from './SugestoesNovas';
 
 const semCategoria = (t: Transacao) => t.items.filter((i) => i.categoria === '').length;
 
@@ -27,6 +26,8 @@ export default function CategorizarProdutos() {
   const [mensagemStatus, setMensagemStatus] = useState('');
   const [isSalvando, setIsSalvando] = useState(false);
   const [erroSalvar, setErroSalvar] = useState('');
+  // Categorias novas propostas pela IA para os itens da nota aberta (id do item → sugestão).
+  const [novas, setNovas] = useState<Record<number, { nome: string; motivo: string }>>({});
 
   const carregarTransacoes = () => {
     buscarApi('/api/transacoes')
@@ -67,6 +68,7 @@ export default function CategorizarProdutos() {
     setStatusIA('idle');
     setMensagemStatus('');
     setErroSalvar('');
+    setNovas({});
     window.scrollTo({ top: 0 });
   };
 
@@ -97,12 +99,17 @@ export default function CategorizarProdutos() {
       if (!res.ok) throw new Error(data?.erro || data?.error || 'Erro na inteligência artificial.');
 
       if (data.sucesso) {
-        const resultado: Sugestao[] = data.resultado;
+        const resultado: SugestaoItem[] = data.resultado;
         const itensAtualizados = transacaoAtiva.items.map((itemAntigo) => {
           const sugestao = resultado.find((r) => r.id === itemAntigo.id);
-          return sugestao ? { ...itemAntigo, categoria: sugestao.categoria } : itemAntigo;
+          return sugestao?.categoria ? { ...itemAntigo, categoria: sugestao.categoria } : itemAntigo;
         });
         setTransacaoAtiva({ ...transacaoAtiva, items: itensAtualizados });
+        const propostas: Record<number, { nome: string; motivo: string }> = {};
+        for (const r of resultado) {
+          if (r.novaCategoria) propostas[r.id] = { nome: r.novaCategoria, motivo: r.motivo ?? '' };
+        }
+        setNovas(propostas);
 
         const seg = Math.floor((Date.now() - tempoInicio) / 1000);
         setStatusIA('sucesso');
@@ -148,6 +155,35 @@ export default function CategorizarProdutos() {
     } finally {
       setIsSalvando(false);
     }
+  };
+
+  /** Sugestões de categoria nova da nota aberta, agrupadas por nome. */
+  const sugestoesNovas: SugestaoNova[] = (() => {
+    if (!transacaoAtiva) return [];
+    const porNome = new Map<string, SugestaoNova>();
+    for (const item of transacaoAtiva.items) {
+      const n = novas[item.id];
+      if (!n) continue;
+      const grupo = porNome.get(n.nome) ?? { nome: n.nome, motivo: n.motivo, itens: [] };
+      grupo.itens.push({ id: item.id, descricao: item.descricao });
+      porNome.set(n.nome, grupo);
+    }
+    return [...porNome.values()];
+  })();
+
+  const esquecerSugestao = (nome: string) =>
+    setNovas((atuais) => Object.fromEntries(Object.entries(atuais).filter(([, n]) => n.nome !== nome)));
+
+  // Categoria aceita e criada: entra na lista e passa a valer para os itens que a IA indicou.
+  const usarCategoriaNova = (nome: string) => {
+    setCategorias((atuais) => (atuais.includes(nome) ? atuais : [...atuais, nome]));
+    if (transacaoAtiva) {
+      setTransacaoAtiva({
+        ...transacaoAtiva,
+        items: transacaoAtiva.items.map((i) => (novas[i.id]?.nome === nome ? { ...i, categoria: nome } : i)),
+      });
+    }
+    esquecerSugestao(nome);
   };
 
   // ── Detalhe de uma nota ──
@@ -198,6 +234,8 @@ export default function CategorizarProdutos() {
             {!isCategorizando && statusIA === 'sucesso' && <span role="status" className="text-[14px] text-sucesso">{mensagemStatus}</span>}
           </div>
           {!isCategorizando && statusIA === 'erro' && <Aviso tipo="erro" className="mt-3">{mensagemStatus}</Aviso>}
+
+          <SugestoesNovas sugestoes={sugestoesNovas} aoCriar={usarCategoriaNova} aoIgnorar={esquecerSugestao} />
 
           <ul className="mt-6 divide-y divide-linha border-t border-linha-forte">
             {transacaoAtiva.items.map((item) => {

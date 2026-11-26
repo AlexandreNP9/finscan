@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Estrutura from './Estrutura';
 import EditorLista, { useListaServidor, type ChaveLista } from './EditorLista';
 import Botao, { Spinner } from './Botao';
@@ -14,10 +14,12 @@ type Props = {
   placeholder: string;
   sugestoes?: string[];
   vazio: string;
+  /** Conteúdo extra entre a descrição e a lista (ex.: objetivo nas categorias). */
+  children?: ReactNode;
 };
 
 /** Página de edição de uma lista do usuário (categorias ou fontes pagadoras). */
-export default function PaginaLista({ chave, titulo, descricao, rotulo, placeholder, sugestoes, vazio }: Props) {
+export default function PaginaLista({ chave, titulo, descricao, rotulo, placeholder, sugestoes, vazio, children }: Props) {
   const lista = useListaServidor(chave);
   const [salvando, setSalvando] = useState(false);
   const [resultado, setResultado] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
@@ -42,6 +44,8 @@ export default function PaginaLista({ chave, titulo, descricao, rotulo, placehol
       <div className="max-w-xl">
         <h1 className="text-[24px] font-semibold tracking-tight">{titulo}</h1>
         <p className="mt-1 text-texto-2">{descricao}</p>
+
+        {children}
 
         <div className="mt-6">
           {lista.carregando ? (

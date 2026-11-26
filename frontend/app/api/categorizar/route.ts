@@ -1,73 +1,82 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { categorias } from '../../../lib/db/schema';
-import { listarNomes } from '../../../lib/db/repositorio';
+import { lerObjetivo, listarNomes } from '../../../lib/db/repositorio';
 import { respostaDeErro } from '../../../lib/api';
 import { exigirUsuario } from '../../../lib/auth';
+import type { SugestaoItem } from '../../../types';
+import { gerarJson, modeloGemini, respostaIaIndisponivel, trechoObjetivo } from '../../../lib/ia';
+
+const TAMANHO_MAX_NOME = 40;
 
 export async function POST(request: Request) {
-    let usuarioId: number;
-    try {
-        usuarioId = (await exigirUsuario()).id;
-    } catch (error) {
-        return respostaDeErro(error, 'Erro ao verificar sessão');
+  let usuarioId: number;
+  try {
+    usuarioId = (await exigirUsuario()).id;
+  } catch (error) {
+    return respostaDeErro(error, 'Erro ao verificar sessão');
+  }
+
+  const modelo = modeloGemini();
+  if (!modelo) return respostaIaIndisponivel();
+
+  try {
+    const { itens } = await request.json();
+    if (!Array.isArray(itens) || itens.length === 0) {
+      return NextResponse.json({ sucesso: false, erro: 'Nenhum item enviado' }, { status: 400 });
     }
 
-    // Sem chave o restante do app funciona; só a categorização por IA fica indisponível.
-    const chaveGemini = process.env.GEMINI_API_KEY?.trim();
-    if (!chaveGemini) {
-        return NextResponse.json(
-            { sucesso: false, erro: 'Categorização por IA indisponível: defina GEMINI_API_KEY no .env e reinicie o app.' },
-            { status: 503 },
-        );
-    }
-    const genAI = new GoogleGenerativeAI(chaveGemini);
+    // Lidos a cada chamada para refletir edições feitas em /categorias.
+    const [cadastradas, objetivo] = await Promise.all([listarNomes(categorias, usuarioId), lerObjetivo(usuarioId)]);
 
-    try {
-        const { itens } = await request.json();
-
-        if (!itens || itens.length === 0) {
-            return NextResponse.json({ error: 'Nenhum item enviado' }, { status: 400 });
-        }
-
-        // Categorias do usuário, lidas a cada chamada para refletir edições feitas em /categorias.
-        const categoriasCadastradas = await listarNomes(categorias, usuarioId);
-
-        // Inicialização otimizada para velocidade e precisão
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-3.1-flash-lite',
-            generationConfig: {
-                temperature: 0.1, // Quase zero criatividade, foco total em classificação lógica rápida
-                responseMimeType: "application/json", // Força a engine a cuspir JSON nativo sem pensar
-            }
-        });
-
-        // Engenharia de Prompt para forçar o Gemini a responder em JSON estrito
-        const prompt = `
+    const prompt = `
       Você é um assistente financeiro especialista em categorização de microgastos.
-      Vou te passar uma lista de produtos que compõem um gasto/transação financeira.
-      Sua tarefa é higienizar o nome do produto (desfazer abreviações, caso haja), analisar o nome do produto e classificá-lo OBRIGATORIAMENTE em UMA destas categorias: ${categoriasCadastradas.join(', ')}.
+      ${trechoObjetivo(objetivo)}
 
-      Aqui estão os produtos:
+      Vou te passar uma lista de produtos de um gasto. Para cada um:
+      1. Higienize o nome (desfaça abreviações, se houver) em "descricaoLimpa".
+      2. Classifique-o OBRIGATORIAMENTE em UMA destas categorias já cadastradas, em "categoria": ${cadastradas.join(', ')}.
+      3. Só se NENHUMA categoria cadastrada servir bem ao item, ou se o objetivo do usuário pedir uma
+         distinção que as categorias atuais não fazem, proponha em "novaCategoria" o nome de uma categoria
+         nova (curto, no mesmo estilo dos nomes cadastrados, no máximo ${TAMANHO_MAX_NOME} caracteres) e explique
+         em "motivo" numa frase curta. Seja conservador: na maioria dos itens, omita "novaCategoria".
+         Nunca proponha categoria nova para item ambíguo ou de descrição indecifrável: só classifique-o.
+         Itens parecidos devem receber exatamente o mesmo nome de categoria nova.
+
+      Produtos:
       ${JSON.stringify(itens)}
 
-      Devolva APENAS um array JSON válido (sem formatação markdown) neste formato:
+      Devolva APENAS um array JSON neste formato:
       [
-        { "id": 123, "descricaoLimpa": "Nome bonito", "categoria": "Alimentação" }
+        { "id": 123, "descricaoLimpa": "Nome legível", "categoria": "Uma das cadastradas" },
+        { "id": 124, "descricaoLimpa": "Outro", "categoria": "Uma das cadastradas", "novaCategoria": "Nome novo", "motivo": "Por quê" }
       ]
     `;
 
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+    const resposta = await gerarJson(modelo, prompt);
+    if (!Array.isArray(resposta)) throw new Error('Resposta da IA fora do formato esperado');
 
-        // Limpa a resposta caso a IA mande as crases do Markdown (```json ... ```)
-        const jsonString = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const categoriasSugeridas = JSON.parse(jsonString);
+    // A IA não é confiável quanto ao formato: só passa o que bate com as regras.
+    const existentes = new Set(cadastradas.map((c) => c.toLowerCase()));
+    const resultado: SugestaoItem[] = resposta
+      .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+      .map((r) => {
+        const categoria = typeof r.categoria === 'string' && cadastradas.includes(r.categoria) ? r.categoria : '';
+        const nova = typeof r.novaCategoria === 'string' ? r.novaCategoria.trim() : '';
+        const sugestao: SugestaoItem = {
+          id: Number(r.id),
+          descricaoLimpa: typeof r.descricaoLimpa === 'string' ? r.descricaoLimpa : '',
+          categoria,
+        };
+        if (nova && nova.length <= TAMANHO_MAX_NOME && !existentes.has(nova.toLowerCase())) {
+          sugestao.novaCategoria = nova;
+          sugestao.motivo = typeof r.motivo === 'string' ? r.motivo.trim() : '';
+        }
+        return sugestao;
+      });
 
-        return NextResponse.json({ sucesso: true, resultado: categoriasSugeridas });
-
-    } catch (error) {
-        console.error('Erro na IA:', error);
-        return NextResponse.json({ error: 'Falha ao classificar itens' }, { status: 500 });
-    }
+    return NextResponse.json({ sucesso: true, resultado });
+  } catch (error) {
+    console.error('Erro na IA:', error);
+    return NextResponse.json({ sucesso: false, erro: 'Falha ao classificar itens' }, { status: 500 });
+  }
 }

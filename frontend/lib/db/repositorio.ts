@@ -309,6 +309,28 @@ export async function atualizarTransacao(payload: unknown, escopo: Escopo): Prom
   });
 }
 
+/**
+ * Exclui uma transação do escopo (os itens vão junto, por cascata). Mesmas regras de edição: no
+ * grupo, excluir a compra de outro membro exige "editar todas". Retorna false se a transação não
+ * existir ou não pertencer ao escopo.
+ */
+export async function excluirTransacao(id: unknown, escopo: Escopo): Promise<boolean> {
+  if (typeof id !== 'number' || !Number.isInteger(id)) throw new ErroValidacao('Transação sem id.');
+
+  return db.transaction(async (tx) => {
+    const [existente] = await tx
+      .select({ autorId: transacoes.usuarioId })
+      .from(transacoes)
+      .where(and(eq(transacoes.id, id), transacoesDoEscopo(escopo)));
+    if (!existente) return false;
+    if (escopo.tipo === 'grupo' && (escopo.somenteLeitura || existente.autorId !== escopo.usuarioId)) {
+      exigirPermissao(escopo, 'editarTodas');
+    }
+    await tx.delete(transacoes).where(eq(transacoes.id, id));
+    return true;
+  });
+}
+
 export type ResumoNovasCategorias = {
   /** Contas pessoais e grupos ativos analisados. */
   donos: number;

@@ -7,7 +7,7 @@ import { formatarBRL, formatarData, nomeMes, paraNumero } from '../../lib/moeda'
 import Estrutura from '../../components/Estrutura';
 import Aviso from '../../components/Aviso';
 import Botao, { LinkBotao, Spinner } from '../../components/Botao';
-import { ChevronIcon } from '../../components/icons';
+import { ChevronIcon, TrashIcon } from '../../components/icons';
 import type { Item, Transacao } from '../../types';
 import { podeRegistrarNo, useContexto } from '../../lib/contexto-cliente';
 
@@ -42,7 +42,10 @@ function ConteudoHistorico() {
   const [erro, setErro] = useState('');
   const [expandidoId, setExpandidoId] = useState<number | null>(null);
   const [busca, setBusca] = useState('');
-  const podeRegistrar = podeRegistrarNo(useContexto());
+  const contexto = useContexto();
+  const podeRegistrar = podeRegistrarNo(contexto);
+  // Grupo só para consulta (finalizado ou de quem saiu): nada pode ser excluído.
+  const somenteLeitura = contexto?.contexto.tipo === 'grupo' && contexto.contexto.somenteLeitura;
   const [listaAgentes, setListaAgentes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -99,6 +102,11 @@ function ConteudoHistorico() {
 
   const aoSalvarFonte = (atualizada: Transacao) =>
     setTransacoes((lista) => lista.map((t) => (t.id === atualizada.id ? atualizada : t)));
+
+  const aoExcluir = (id: number) => {
+    setTransacoes((lista) => lista.filter((t) => t.id !== id));
+    setExpandidoId(null);
+  };
 
   /** "Registrado por" só interessa quando foi outra pessoa. */
   const detalhes = (t: Transacao) =>
@@ -191,6 +199,7 @@ function ConteudoHistorico() {
                         <td colSpan={4} className="pb-4 pt-1">
                           <EditarFonte transacao={t} agentes={listaAgentes} aoSalvar={aoSalvarFonte} />
                           <TabelaItens itens={t.items} />
+                          {!somenteLeitura && <ExcluirTransacao transacao={t} aoExcluir={aoExcluir} />}
                         </td>
                       </tr>
                     )}
@@ -221,6 +230,7 @@ function ConteudoHistorico() {
                     <div className="pb-4">
                       <EditarFonte transacao={t} agentes={listaAgentes} aoSalvar={aoSalvarFonte} />
                       <TabelaItens itens={t.items} />
+                      {!somenteLeitura && <ExcluirTransacao transacao={t} aoExcluir={aoExcluir} />}
                     </div>
                   )}
                 </li>
@@ -290,6 +300,60 @@ function EditarFonte({ transacao, agentes, aoSalvar }: { transacao: Transacao; a
         <p className="mt-1 text-[13px] text-texto-3">
           Nenhuma fonte pagadora cadastrada. <a href="/agentes" className="text-acao underline underline-offset-2">Cadastrar</a>
         </p>
+      )}
+      {erro && <p role="alert" className="mt-1 text-[13px] text-erro">{erro}</p>}
+    </div>
+  );
+}
+
+/** Exclusão com confirmação em linha (sem diálogo do navegador). */
+function ExcluirTransacao({ transacao, aoExcluir }: { transacao: Transacao; aoExcluir: (id: number) => void }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erro, setErro] = useState('');
+
+  const excluir = async () => {
+    setExcluindo(true);
+    setErro('');
+    try {
+      const res = await buscarApi('/api/transacoes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: transacao.id }),
+      });
+      if (res.ok) {
+        aoExcluir(transacao.id);
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      setErro(data?.erro || 'Não foi possível excluir.');
+    } catch {
+      setErro('Erro de conexão.');
+    }
+    setExcluindo(false);
+  };
+
+  return (
+    <div className="mt-3">
+      {confirmando ? (
+        <div role="group" aria-label="Confirmar exclusão" className="rounded-lg bg-erro-suave p-3">
+          <p className="text-[14px]">
+            Excluir a compra em <strong>{transacao.estabelecimento || 'estabelecimento desconhecido'}</strong> de{' '}
+            {formatarBRL(transacao.valorTotal)}? Os itens também serão apagados e não dá para desfazer.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Botao variante="perigo" onClick={excluir} disabled={excluindo}>
+              {excluindo ? <><Spinner /> Excluindo…</> : 'Excluir'}
+            </Botao>
+            <Botao variante="secundario" onClick={() => { setConfirmando(false); setErro(''); }} disabled={excluindo}>
+              Cancelar
+            </Botao>
+          </div>
+        </div>
+      ) : (
+        <Botao variante="perigoDiscreto" onClick={() => setConfirmando(true)} className="-ml-4">
+          <TrashIcon /> Excluir compra
+        </Botao>
       )}
       {erro && <p role="alert" className="mt-1 text-[13px] text-erro">{erro}</p>}
     </div>

@@ -390,6 +390,16 @@ export async function apagarSessao(tokenHash: string): Promise<void> {
   await db.delete(sessoes).where(eq(sessoes.tokenHash, tokenHash));
 }
 
+/** Grupo escolhido como contexto na sessão (null = conta pessoal). */
+export async function grupoAtivoDaSessao(tokenHash: string): Promise<number | null> {
+  const [linha] = await db.select({ grupoAtivoId: sessoes.grupoAtivoId }).from(sessoes).where(eq(sessoes.tokenHash, tokenHash));
+  return linha?.grupoAtivoId ?? null;
+}
+
+export async function definirGrupoAtivoDaSessao(tokenHash: string, grupoId: number | null): Promise<void> {
+  await db.update(sessoes).set({ grupoAtivoId: grupoId }).where(eq(sessoes.tokenHash, tokenHash));
+}
+
 /** Usuário dono de uma sessão ainda válida, ou null. */
 export async function usuarioDaSessao(tokenHash: string): Promise<Usuario | null> {
   const [linha] = await db

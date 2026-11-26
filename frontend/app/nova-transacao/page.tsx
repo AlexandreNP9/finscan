@@ -123,6 +123,27 @@ export default function NovaTransacao() {
     setEtapa(2);
   };
 
+  const limparFormulario = () => {
+    setEtapa(1);
+    setIsScanning(false);
+    setIsPastingHtml(false);
+    setHtmlInput('');
+    setNomeArquivo('');
+    setIsProcessing(false);
+    setIsSaving(false);
+    setErroCaptura('');
+    setErroSalvar('');
+    setErroAgente(false);
+    setItems([]);
+    setChaveAcesso('');
+    setValorTotal('');
+    setEstabelecimentoNota('');
+    setDataEmissao('');
+    setHoraEmissao('');
+    setAgenteOrigem('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const salvarTransacao = async () => {
     if (!agenteEscolhido) { setErroAgente(true); return; }
     setIsSaving(true);
@@ -132,6 +153,9 @@ export default function NovaTransacao() {
     try {
       const res = await buscarApi('/api/transacoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
+        // Com cacheComponents, o Next mantém esta rota oculta (<Activity>) em vez de desmontá-la:
+        // sem limpar o estado, a próxima visita reabriria a compra salva com o botão carregando.
+        limparFormulario();
         router.push('/');
         return;
       }

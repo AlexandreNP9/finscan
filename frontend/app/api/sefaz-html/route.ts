@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import type { Item } from '../../../types';
 import { bloquearSemLogin } from '../../../lib/api';
 
 export async function POST(request: Request) {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     const chave = $('.chave').text().replace(/\D/g, '');
 
     // Extrai os Itens
-    const itens: any[] = [];
+    const itens: Item[] = [];
     $('#tabResult tr').each((index, element) => {
       const descricao = $(element).find('.txtTit').first().text().trim();
       if (!descricao || descricao.includes('Vl. Total')) return; // Pula cabeçalhos ou linhas vazias
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
 
       itens.push({
         id: Date.now() + index, // ID temporário para o React
+        codigo: '', // esta variante da página não traz o código do produto
         descricao,
         qtd: qtdStr || '1',
         un: unStr || 'UN',
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ sucesso: true, estabelecimento, valorTotalNota, emissao, chave, itens });
     
   } catch (error) {
+    console.error('Erro ao processar o HTML da SEFAZ:', error);
     return NextResponse.json({ sucesso: false, erro: 'Erro ao processar o HTML.' }, { status: 500 });
   }
 }

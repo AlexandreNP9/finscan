@@ -6,7 +6,9 @@ import {
   apagarSessao,
   buscarUsuarioPorEmail,
   gravarSessao,
+  escopoPessoal,
   usuarioDaSessao,
+  type Escopo,
   type Usuario,
 } from './db/repositorio';
 import { ErroValidacao } from './db/formato';
@@ -101,4 +103,14 @@ export async function exigirUsuario(): Promise<Usuario> {
   const usuario = await usuarioAtual();
   if (!usuario) throw new ErroNaoAutenticado();
   return usuario;
+}
+
+/**
+ * Escopo dos dados da requisição: a conta pessoal do usuário logado ou o grupo que ele escolheu.
+ * Todas as rotas de dados (transações, categorias, fontes, IA) passam por aqui.
+ * Por enquanto é sempre a conta pessoal; a escolha do grupo ativo vem com o alternador de contexto.
+ */
+export async function exigirEscopo(): Promise<{ usuario: Usuario; escopo: Escopo }> {
+  const usuario = await exigirUsuario();
+  return { usuario, escopo: escopoPessoal(usuario.id) };
 }

@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import { categorias } from '../../../lib/db/schema';
-import { lerObjetivo, listarNomes } from '../../../lib/db/repositorio';
+import { lerObjetivo, listarNomes, type Escopo } from '../../../lib/db/repositorio';
 import { respostaDeErro } from '../../../lib/api';
-import { exigirUsuario } from '../../../lib/auth';
+import { exigirEscopo } from '../../../lib/auth';
 import type { SugestaoItem } from '../../../types';
 import { gerarJson, modeloGemini, respostaIaIndisponivel, trechoObjetivo } from '../../../lib/ia';
 
 const TAMANHO_MAX_NOME = 40;
 
 export async function POST(request: Request) {
-  let usuarioId: number;
+  let escopo: Escopo;
   try {
-    usuarioId = (await exigirUsuario()).id;
+    ({ escopo } = await exigirEscopo());
   } catch (error) {
     return respostaDeErro(error, 'Erro ao verificar sessão');
   }
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     // Lidos a cada chamada para refletir edições feitas em /categorias.
-    const [cadastradas, objetivo] = await Promise.all([listarNomes(categorias, usuarioId), lerObjetivo(usuarioId)]);
+    const [cadastradas, objetivo] = await Promise.all([listarNomes(categorias, escopo), lerObjetivo(escopo)]);
 
     const prompt = `
       Você é um assistente financeiro especialista em categorização de microgastos.

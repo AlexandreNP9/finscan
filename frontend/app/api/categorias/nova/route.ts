@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { categorias } from '../../../../lib/db/schema';
-import { acrescentarNomes, lerObjetivo, listarItensCategorizados } from '../../../../lib/db/repositorio';
+import { acrescentarNomes, lerObjetivo, listarItensCategorizados, type Escopo } from '../../../../lib/db/repositorio';
 import { ErroValidacao } from '../../../../lib/db/formato';
 import { respostaDeErro } from '../../../../lib/api';
-import { exigirUsuario } from '../../../../lib/auth';
+import { exigirEscopo } from '../../../../lib/auth';
 import { gerarJson, modeloGemini, trechoObjetivo } from '../../../../lib/ia';
 import type { CandidatoRemapeamento } from '../../../../types';
 
@@ -16,14 +16,14 @@ const LIMITE_ITENS = 300;
  * e confirma em /api/categorias/mover. Se a IA falhar, a categoria continua criada.
  */
 export async function POST(request: Request) {
-  let usuarioId: number;
+  let escopo: Escopo;
   let nome: string;
   try {
-    usuarioId = (await exigirUsuario()).id;
+    ({ escopo } = await exigirEscopo());
     const corpo = await request.json();
     nome = typeof corpo.nome === 'string' ? corpo.nome.trim() : '';
     if (!nome) throw new ErroValidacao('Informe o nome da categoria.');
-    await acrescentarNomes(categorias, [nome], usuarioId);
+    await acrescentarNomes(categorias, [nome], escopo);
   } catch (error) {
     return respostaDeErro(error, 'Erro ao criar categoria');
   }
@@ -33,8 +33,8 @@ export async function POST(request: Request) {
 
   try {
     const [itens, objetivo] = await Promise.all([
-      listarItensCategorizados(usuarioId, nome, LIMITE_ITENS),
-      lerObjetivo(usuarioId),
+      listarItensCategorizados(escopo, nome, LIMITE_ITENS),
+      lerObjetivo(escopo),
     ]);
     if (itens.length === 0) return NextResponse.json({ sucesso: true, candidatos: [] });
 

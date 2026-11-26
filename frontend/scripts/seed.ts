@@ -13,7 +13,7 @@ import path from 'node:path';
 import { sql } from 'drizzle-orm';
 import { db } from '../lib/db';
 import { agentes, categorias, transacoes } from '../lib/db/schema';
-import { acrescentarNomes, buscarUsuarioPorEmail, criarTransacao } from '../lib/db/repositorio';
+import { acrescentarNomes, buscarUsuarioPorEmail, criarTransacao, escopoPessoal } from '../lib/db/repositorio';
 
 function lerJson<T>(arquivo: string): T {
   return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', arquivo), 'utf8'));
@@ -42,8 +42,8 @@ async function main() {
   const todosAgentes = [...new Set([...nomesAgentes, ...agentesUsados].map((n) => n.trim()).filter(Boolean))];
 
   // Com e-mail, vão para a lista desse usuário (que já tem as categorias padrão); sem, ficam sem dono.
-  await acrescentarNomes(categorias, todasCategorias, usuarioId);
-  await acrescentarNomes(agentes, todosAgentes, usuarioId);
+  await acrescentarNomes(categorias, todasCategorias, escopoPessoal(usuarioId));
+  await acrescentarNomes(agentes, todosAgentes, escopoPessoal(usuarioId));
   console.log(`Categorias: ${todasCategorias.length}, agentes: ${todosAgentes.length}`);
 
   const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(transacoes);
@@ -55,7 +55,7 @@ async function main() {
   // O JSON guarda a mais recente primeiro; inserimos de trás para frente para manter a mesma ordem
   // (a API lista por id decrescente).
   for (const t of [...transacoesJson].reverse()) {
-    await criarTransacao(t, usuarioId);
+    await criarTransacao(t, escopoPessoal(usuarioId));
   }
   console.log(`Transações importadas: ${transacoesJson.length}${email ? ` (vinculadas a ${email})` : ' (sem dono)'}`);
 }

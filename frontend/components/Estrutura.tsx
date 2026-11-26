@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import MenuUsuario from './MenuUsuario';
-import SeletorContexto from './SeletorContexto';
+import SeletorContexto, { alternarContexto } from './SeletorContexto';
+import { podeRegistrarNo, useContexto } from '../lib/contexto-cliente';
+import { formatarData } from '../lib/moeda';
 import { classeBotao } from './Botao';
 import { HomeIcon, ListIcon, PlusIcon, TagIcon } from './icons';
 
@@ -35,6 +37,9 @@ function Contador({ n }: { n?: number }) {
 export default function Estrutura({ children, pendentes, semNavInferior }: Props) {
   const rota = usePathname();
   const ativo = (href: string) => (href === '/' ? rota === '/' : rota.startsWith(href));
+  const dados = useContexto();
+  const podeRegistrar = podeRegistrarNo(dados);
+  const contexto = dados?.contexto;
 
   return (
     <div className="flex-1 flex flex-col">
@@ -60,17 +65,31 @@ export default function Estrutura({ children, pendentes, semNavInferior }: Props
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
-            <div className="hidden md:block">
-              <Link href="/nova-transacao" className={classeBotao('primario')}>
-                <PlusIcon /> Registrar compra
-              </Link>
-            </div>
+            {podeRegistrar && (
+              <div className="hidden md:block">
+                <Link href="/nova-transacao" className={classeBotao('primario')}>
+                  <PlusIcon /> Registrar compra
+                </Link>
+              </div>
+            )}
             <MenuUsuario />
           </div>
         </div>
       </header>
 
       <main className={`mx-auto w-full max-w-5xl flex-1 px-4 md:px-6 pt-6 md:pt-8 ${semNavInferior ? 'pb-10' : 'pb-nav'}`}>
+        {contexto?.tipo === 'grupo' && contexto.somenteLeitura && (
+          <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg bg-acao-suave px-3 py-2.5 text-[14px] text-acao">
+            <span>
+              {contexto.motivo === 'finalizado'
+                ? `O grupo “${contexto.nome}” foi finalizado. Você está vendo o histórico, só para consulta.`
+                : `Você saiu do grupo “${contexto.nome}”. Aparecem só as compras registradas até ${formatarData((contexto.ate ?? '').slice(0, 10))}, só para consulta.`}
+            </span>
+            <button type="button" onClick={() => alternarContexto(null)} className="font-semibold underline underline-offset-2">
+              Ir para a conta pessoal
+            </button>
+          </div>
+        )}
         {children}
       </main>
 
@@ -80,14 +99,16 @@ export default function Estrutura({ children, pendentes, semNavInferior }: Props
           className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-superficie border-t border-linha"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          <div className="grid grid-cols-4 h-16">
+          <div className={`grid ${podeRegistrar ? 'grid-cols-4' : 'grid-cols-3'} h-16`}>
             {LINKS.slice(0, 2).map((l) => (
               <ItemNav key={l.href} href={l.href} rotulo={l.curto} icone={l.icone} ativo={ativo(l.href)} />
             ))}
-            <Link href="/nova-transacao" className="flex flex-col items-center justify-center gap-0.5 text-acao">
-              <span className="w-11 h-9 rounded-lg bg-acao text-white flex items-center justify-center"><PlusIcon /></span>
-              <span className="text-[11px] font-semibold">Registrar</span>
-            </Link>
+            {podeRegistrar && (
+              <Link href="/nova-transacao" className="flex flex-col items-center justify-center gap-0.5 text-acao">
+                <span className="w-11 h-9 rounded-lg bg-acao text-white flex items-center justify-center"><PlusIcon /></span>
+                <span className="text-[11px] font-semibold">Registrar</span>
+              </Link>
+            )}
             <ItemNav href={LINKS[2].href} rotulo={LINKS[2].curto} icone={LINKS[2].icone} ativo={ativo(LINKS[2].href)} contador={pendentes} />
           </div>
         </nav>

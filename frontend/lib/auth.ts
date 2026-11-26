@@ -14,7 +14,7 @@ import {
   type Usuario,
 } from './db/repositorio';
 import { ErroValidacao } from './db/formato';
-import { buscarParticipacao, listarGruposDoUsuario } from './db/grupos';
+import { buscarParticipacao, listarGruposDoUsuario, privilegiosEfetivos, type Privilegios } from './db/grupos';
 
 // Sessões ficam no banco: o cookie (HTTP-only) carrega um token aleatório e a tabela `sessoes`
 // guarda só o SHA-256 dele. Assim o logout revoga a sessão e não é preciso nenhum segredo no .env.
@@ -113,54 +113,81 @@ async function tokenHashAtual(): Promise<string | null> {
   return token ? hashToken(token) : null;
 }
 
-/** Grupo em que o usuário pode operar agora: membro ativo de um grupo não finalizado. */
-async function grupoUtilizavel(usuarioId: number, grupoId: number) {
-  const participacao = await buscarParticipacao(usuarioId, grupoId);
-  if (!participacao || participacao.membro.saiuEm || participacao.grupo.finalizadoEm) return null;
-  return participacao;
-}
+export type Contexto =
+  | { tipo: 'pessoal' }
+  | {
+      tipo: 'grupo';
+      grupoId: number;
+      nome: string;
+      souHost: boolean;
+      privilegios: Privilegios;
+      /** Ex-membro ou grupo finalizado: só consulta. */
+      somenteLeitura: boolean;
+      motivo: 'finalizado' | 'saiu' | null;
+      /** Para ex-membro: data da saída (ISO); só as compras registradas até ela aparecem. */
+      ate: string | null;
+    };
 
-export type Contexto = { tipo: 'pessoal' } | { tipo: 'grupo'; grupoId: number; nome: string };
+/** Escopo e contexto do usuário num grupo de que participa ou participou; null se nunca participou. */
+async function acessoAoGrupo(usuarioId: number, grupoId: number): Promise<{ escopo: Escopo; contexto: Contexto } | null> {
+  const p = await buscarParticipacao(usuarioId, grupoId);
+  if (!p) return null;
+  const ate = p.membro.saiuEm;
+  const motivo = p.grupo.finalizadoEm ? 'finalizado' : ate ? 'saiu' : null;
+  const somenteLeitura = motivo !== null;
+  const privilegios = privilegiosEfetivos(p);
+  return {
+    escopo: { tipo: 'grupo', usuarioId, grupoId, privilegios, somenteLeitura, ate },
+    contexto: {
+      tipo: 'grupo',
+      grupoId,
+      nome: p.grupo.nome,
+      souHost: p.souHost,
+      privilegios,
+      somenteLeitura,
+      motivo,
+      ate: ate ? ate.toISOString() : null,
+    },
+  };
+}
 
 /**
  * Escopo dos dados da requisição: a conta pessoal do usuário logado ou o grupo escolhido na
- * sessão. Todas as rotas de dados (transações, categorias, fontes, IA) passam por aqui.
- * Se o grupo guardado na sessão deixou de valer (saiu, foi finalizado), volta para o pessoal.
+ * sessão. Todas as rotas de dados (transações, categorias, fontes, IA) passam por aqui; as
+ * permissões do grupo são aplicadas no repositório a partir do escopo. Ex-membros e grupos
+ * finalizados abrem em modo somente leitura. Se o usuário nunca participou do grupo guardado
+ * na sessão, ela volta para a conta pessoal.
  */
 export async function exigirEscopo(): Promise<{ usuario: Usuario; escopo: Escopo; contexto: Contexto }> {
   const usuario = await exigirUsuario();
   const tokenHash = await tokenHashAtual();
   const grupoId = tokenHash ? await grupoAtivoDaSessao(tokenHash) : null;
   if (grupoId !== null) {
-    const participacao = await grupoUtilizavel(usuario.id, grupoId);
-    if (participacao) {
-      return {
-        usuario,
-        escopo: { tipo: 'grupo', usuarioId: usuario.id, grupoId },
-        contexto: { tipo: 'grupo', grupoId, nome: participacao.grupo.nome },
-      };
-    }
+    const acesso = await acessoAoGrupo(usuario.id, grupoId);
+    if (acesso) return { usuario, ...acesso };
     if (tokenHash) await definirGrupoAtivoDaSessao(tokenHash, null);
   }
   return { usuario, escopo: escopoPessoal(usuario.id), contexto: { tipo: 'pessoal' } };
 }
 
-/** Contexto atual e os grupos para onde o usuário pode alternar (só os ativos). */
+/** Contexto atual e os grupos para onde o usuário pode alternar (os encerrados marcados como histórico). */
 export async function contextoEOpcoes() {
   const { usuario, contexto } = await exigirEscopo();
-  const grupos = (await listarGruposDoUsuario(usuario.id))
-    .filter((g) => !g.saiu && !g.finalizado)
-    .map((g) => ({ grupoId: g.id, nome: g.nome }));
+  const grupos = (await listarGruposDoUsuario(usuario.id)).map((g) => ({
+    grupoId: g.id,
+    nome: g.nome,
+    historico: g.saiu || g.finalizado,
+  }));
   return { contexto, grupos };
 }
 
-/** Troca o contexto da sessão (null = conta pessoal). Grupo inválido → ErroValidacao. */
+/** Troca o contexto da sessão (null = conta pessoal). Grupo de que nunca participou → ErroValidacao. */
 export async function definirContexto(grupoId: unknown): Promise<void> {
   const usuario = await exigirUsuario();
   const tokenHash = await tokenHashAtual();
   if (!tokenHash) throw new ErroNaoAutenticado();
   if (grupoId === null) return definirGrupoAtivoDaSessao(tokenHash, null);
   if (typeof grupoId !== 'number' || !Number.isInteger(grupoId)) throw new ErroValidacao('Grupo inválido.');
-  if (!(await grupoUtilizavel(usuario.id, grupoId))) throw new ErroValidacao('Você não participa deste grupo.');
+  if (!(await acessoAoGrupo(usuario.id, grupoId))) throw new ErroValidacao('Você não participa deste grupo.');
   await definirGrupoAtivoDaSessao(tokenHash, grupoId);
 }

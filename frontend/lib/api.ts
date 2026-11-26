@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
-import { ErroValidacao } from './db/formato';
+import { ErroSemPermissao, ErroValidacao } from './db/formato';
 import { ErroNaoAutenticado, exigirUsuario } from './auth';
 
-/** Não autenticado → 401; validação → 400 com a mensagem; qualquer outro → 500 genérico. */
+/** Não autenticado → 401; sem permissão → 403; validação → 400 (com a mensagem); qualquer outro → 500 genérico. */
 export function respostaDeErro(error: unknown, mensagemPadrao: string) {
   if (error instanceof ErroNaoAutenticado) {
     return NextResponse.json({ sucesso: false, erro: error.message }, { status: 401 });
+  }
+  if (error instanceof ErroSemPermissao) {
+    return NextResponse.json({ sucesso: false, erro: error.message }, { status: 403 });
   }
   if (error instanceof ErroValidacao) {
     return NextResponse.json({ sucesso: false, erro: error.message }, { status: 400 });

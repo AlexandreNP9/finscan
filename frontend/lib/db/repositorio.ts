@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, getTableColumns, gt, inArray, isNull, lte, notInArray, sql, type Column } from 'drizzle-orm';
 import { db, type Db } from './index';
 import { agentes, categorias, grupos, itens, sessoes, transacoes, usuarios } from './schema';
-import { brParaNumeric, ErroValidacao, numericParaBr, validarData, validarHora } from './formato';
+import { brParaNumeric, ErroSemPermissao, ErroValidacao, numericParaBr, validarData, validarHora } from './formato';
+import type { Privilegios } from './grupos';
 import { CATEGORIAS_PADRAO } from './categorias-padrao';
 import type { Item, Transacao } from '../../types';
 
@@ -15,11 +16,13 @@ type TabelaLista = typeof categorias | typeof agentes;
 /**
  * De quem são os dados que uma operação lê ou grava: a conta pessoal de um usuário ou um grupo.
  * Em `pessoal`, `usuarioId` null só ocorre no seed sem e-mail, que trabalha com os dados ainda
- * sem dono. Em `grupo`, `usuarioId` é quem está agindo (vira o autor das transações que registrar).
+ * sem dono. Em `grupo`, `usuarioId` é quem está agindo (vira o autor das transações que registrar),
+ * com os privilégios dele no grupo. `somenteLeitura`: ex-membro ou grupo finalizado. `ate`: quem
+ * saiu só enxerga as transações registradas até a saída.
  */
 export type Escopo =
   | { tipo: 'pessoal'; usuarioId: number | null }
-  | { tipo: 'grupo'; usuarioId: number; grupoId: number };
+  | { tipo: 'grupo'; usuarioId: number; grupoId: number; privilegios: Privilegios; somenteLeitura: boolean; ate: Date | null };
 
 export const escopoPessoal = (usuarioId: number | null): Escopo => ({ tipo: 'pessoal', usuarioId });
 
@@ -33,6 +36,28 @@ function doDono(coluna: Column, usuarioId: number | null) {
  */
 function doEscopo(tabela: { usuarioId: Column; grupoId: Column }, e: Escopo) {
   return e.tipo === 'grupo' ? eq(tabela.grupoId, e.grupoId) : and(doDono(tabela.usuarioId, e.usuarioId), isNull(tabela.grupoId));
+}
+
+/** Transações visíveis no escopo (para ex-membro, só as registradas até a saída). */
+function transacoesDoEscopo(e: Escopo) {
+  const base = doEscopo(transacoes, e);
+  return e.tipo === 'grupo' && e.ate ? and(base, lte(transacoes.criadoEm, e.ate)) : base;
+}
+
+type Acao = 'registrar' | 'editarTodas' | 'gerenciarListas';
+
+const SEM_PERMISSAO: Record<Acao, string> = {
+  registrar: 'Você não tem permissão para registrar compras neste grupo. Peça ao host.',
+  editarTodas: 'Você só pode editar as compras que você registrou neste grupo. Peça ao host para liberar.',
+  gerenciarListas: 'Você não tem permissão para alterar categorias, fontes pagadoras ou o objetivo deste grupo. Peça ao host.',
+};
+
+/** Na conta pessoal tudo é permitido; no grupo, depende do privilégio e de o grupo não estar somente leitura. */
+function exigirPermissao(e: Escopo, acao: Acao): void {
+  if (e.tipo !== 'grupo') return;
+  if (e.somenteLeitura) throw new ErroSemPermissao('Este grupo está disponível só para consulta.');
+  const permitido = { registrar: e.privilegios.podeRegistrar, editarTodas: e.privilegios.podeEditarTodas, gerenciarListas: e.privilegios.podeGerenciarListas }[acao];
+  if (!permitido) throw new ErroSemPermissao(SEM_PERMISSAO[acao]);
 }
 
 /** Colunas de dono de uma linha nova de categoria/agente. */
@@ -56,6 +81,7 @@ export async function substituirLista(tabela: TabelaLista, nomes: unknown, escop
   if (!Array.isArray(nomes) || nomes.some((n) => typeof n !== 'string')) {
     throw new ErroValidacao('A lista deve ser um array de textos.');
   }
+  exigirPermissao(escopo, 'gerenciarListas');
   const limpos = [...new Set((nomes as string[]).map((n) => n.trim()).filter(Boolean))];
   const doDonoDaLista = doEscopo(tabela, escopo);
   const dono = donoDaLista(escopo);
@@ -76,6 +102,7 @@ export async function substituirLista(tabela: TabelaLista, nomes: unknown, escop
 /** Acrescenta nomes ao fim da lista do dono, ignorando os que já existem (usado pelo seed). */
 export async function acrescentarNomes(tabela: TabelaLista, nomes: string[], escopo: Escopo): Promise<void> {
   if (nomes.length === 0) return;
+  exigirPermissao(escopo, 'gerenciarListas');
   const [{ maior }] = await db
     .select({ maior: sql<number>`coalesce(max(${tabela.ordem}), -1)::int` })
     .from(tabela)
@@ -101,6 +128,7 @@ export async function lerObjetivo(escopo: Escopo): Promise<string> {
 }
 
 export async function gravarObjetivo(escopo: Escopo, objetivo: unknown): Promise<string> {
+  exigirPermissao(escopo, 'gerenciarListas');
   if (typeof objetivo !== 'string') throw new ErroValidacao('O objetivo deve ser um texto.');
   const limpo = objetivo.trim();
   if (limpo.length > TAMANHO_MAX_OBJETIVO) {
@@ -126,13 +154,14 @@ export async function listarItensCategorizados(escopo: Escopo, excetoCategoria: 
     .from(itens)
     .innerJoin(transacoes, eq(itens.transacaoId, transacoes.id))
     .innerJoin(categorias, eq(itens.categoriaId, categorias.id))
-    .where(and(doEscopo(transacoes, escopo), sql`${categorias.nome} <> ${excetoCategoria}`))
+    .where(and(transacoesDoEscopo(escopo), sql`${categorias.nome} <> ${excetoCategoria}`))
     .orderBy(desc(transacoes.dataEmissao), desc(itens.id))
     .limit(limite);
 }
 
 /** Move itens do escopo para uma categoria dele. Ids de fora do escopo são ignorados. */
 export async function moverItensParaCategoria(escopo: Escopo, idsItens: unknown, nomeCategoria: unknown): Promise<number> {
+  exigirPermissao(escopo, 'editarTodas');
   if (!Array.isArray(idsItens) || idsItens.some((id) => !Number.isInteger(id))) {
     throw new ErroValidacao('"itens" deve ser uma lista de ids.');
   }
@@ -150,7 +179,7 @@ export async function moverItensParaCategoria(escopo: Escopo, idsItens: unknown,
     .where(
       and(
         inArray(itens.id, idsItens as number[]),
-        inArray(itens.transacaoId, db.select({ id: transacoes.id }).from(transacoes).where(doEscopo(transacoes, escopo))),
+        inArray(itens.transacaoId, db.select({ id: transacoes.id }).from(transacoes).where(transacoesDoEscopo(escopo))),
       ),
     )
     .returning({ id: itens.id });
@@ -166,7 +195,7 @@ export async function listarTransacoes(escopo: Escopo): Promise<Transacao[]> {
     .from(transacoes)
     .leftJoin(agentes, eq(transacoes.agenteId, agentes.id))
     .leftJoin(usuarios, eq(transacoes.usuarioId, usuarios.id))
-    .where(doEscopo(transacoes, escopo))
+    .where(transacoesDoEscopo(escopo))
     .orderBy(desc(transacoes.id));
 
   const linhasItens = await db
@@ -174,7 +203,7 @@ export async function listarTransacoes(escopo: Escopo): Promise<Transacao[]> {
     .from(itens)
     .innerJoin(transacoes, eq(itens.transacaoId, transacoes.id))
     .leftJoin(categorias, eq(itens.categoriaId, categorias.id))
-    .where(doEscopo(transacoes, escopo))
+    .where(transacoesDoEscopo(escopo))
     .orderBy(asc(itens.transacaoId), asc(itens.ordem), asc(itens.id));
 
   const itensPorTransacao = new Map<number, Item[]>();
@@ -212,6 +241,7 @@ export async function listarTransacoes(escopo: Escopo): Promise<Transacao[]> {
  * usuário). Ids de itens enviados pelo cliente são ignorados.
  */
 export async function criarTransacao(payload: unknown, escopo: Escopo): Promise<number> {
+  exigirPermissao(escopo, 'registrar');
   const p = exigirObjeto(payload, 'transação');
   const itensEntrada = exigirItens(p.items);
 
@@ -244,10 +274,14 @@ export async function atualizarTransacao(payload: unknown, escopo: Escopo): Prom
   return db.transaction(async (tx) => {
     // Dono primeiro: transação de outro escopo é "não encontrada", sem validar o resto do payload.
     const [existente] = await tx
-      .select({ id: transacoes.id })
+      .select({ id: transacoes.id, autorId: transacoes.usuarioId })
       .from(transacoes)
-      .where(and(eq(transacoes.id, transacaoId), doEscopo(transacoes, escopo)));
+      .where(and(eq(transacoes.id, transacaoId), transacoesDoEscopo(escopo)));
     if (!existente) return false;
+    // No grupo, editar a compra de outro membro exige "editar todas"; a própria, só não estar somente leitura.
+    if (escopo.tipo === 'grupo' && (escopo.somenteLeitura || existente.autorId !== escopo.usuarioId)) {
+      exigirPermissao(escopo, 'editarTodas');
+    }
 
     const cabecalho = await lerCabecalho(tx, p, escopo);
     await tx.update(transacoes).set(cabecalho).where(eq(transacoes.id, transacaoId));

@@ -31,3 +31,23 @@ export function nomeMes(mesAno: string): string {
   const [ano, mes] = mesAno.split('-').map(Number);
   return new Date(ano, mes - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
 }
+
+/**
+ * Valor digitado pelo usuário → centavos (inteiro, sem erro de float).
+ * Aceita "1500", "1500,5", "1.500,50", "R$ 1.500,50", "1500.50" e "1.500" (mil e quinhentos).
+ * Retorna null se o texto não for um valor válido.
+ */
+export function paraCentavos(texto: string): number | null {
+  let t = texto.replace(/R\$|\s/g, '');
+  if (!t) return null;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  const [inteiro, decimal = ''] = t.split('.');
+  return Number(inteiro) * 100 + Number(decimal.padEnd(2, '0'));
+}
+
+/** 150050 → "1500,50" (formato da API). */
+export function centavosParaBR(centavos: number): string {
+  return `${Math.floor(centavos / 100)},${String(centavos % 100).padStart(2, '0')}`;
+}

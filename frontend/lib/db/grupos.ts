@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { db } from './index';
 import { categorias, grupos, membrosGrupo, usuarios } from './schema';
-import { ErroValidacao } from './formato';
+import { ErroSemPermissao, ErroValidacao } from './formato';
 import { CATEGORIAS_PADRAO } from './categorias-padrao';
 
 // Parte do repositório dedicada aos grupos (épico #95): criação, entrada por código, consulta.
@@ -196,4 +196,87 @@ export async function gerarNovoCodigo(usuarioId: number, grupoId: number): Promi
     if (ok) return codigo;
   }
   throw new Error('Não foi possível gerar um código de convite único.');
+}
+
+// ---------- Gestão (#99): privilégios, remoção, transferência de host, saída ----------
+
+/** Participação ativa do usuário como host de um grupo ativo; senão erro. null se nem participa. */
+async function exigirHost(usuarioId: number, grupoId: number) {
+  const p = await buscarParticipacao(usuarioId, grupoId);
+  if (!p || p.membro.saiuEm) return null;
+  if (p.grupo.finalizadoEm) throw new ErroSemPermissao('Este grupo foi finalizado.');
+  if (!p.souHost) throw new ErroSemPermissao('Só o host pode fazer isso.');
+  return p;
+}
+
+/** Membro ativo (não o host) do grupo, para o host alterar. */
+async function membroAlteravel(grupoId: number, hostId: number, alvoId: unknown) {
+  if (typeof alvoId !== 'number' || !Number.isInteger(alvoId)) throw new ErroValidacao('Membro inválido.');
+  if (alvoId === hostId) throw new ErroValidacao('O host sempre tem todos os privilégios.');
+  const [m] = await db
+    .select()
+    .from(membrosGrupo)
+    .where(and(eq(membrosGrupo.grupoId, grupoId), eq(membrosGrupo.usuarioId, alvoId)));
+  if (!m || m.saiuEm) throw new ErroValidacao('Essa pessoa não participa mais do grupo.');
+  return m;
+}
+
+function lerPrivilegios(valor: unknown): Privilegios {
+  if (!valor || typeof valor !== 'object') throw new ErroValidacao('Privilégios inválidos.');
+  const v = valor as Record<string, unknown>;
+  const chaves: (keyof Privilegios)[] = ['podeRegistrar', 'podeEditarTodas', 'podeGerenciarListas', 'podeConvidar'];
+  if (chaves.some((c) => typeof v[c] !== 'boolean')) throw new ErroValidacao('Privilégios inválidos.');
+  return { podeRegistrar: !!v.podeRegistrar, podeEditarTodas: !!v.podeEditarTodas, podeGerenciarListas: !!v.podeGerenciarListas, podeConvidar: !!v.podeConvidar };
+}
+
+/** O host define os privilégios de um membro. false = grupo não encontrado para o usuário. */
+export async function definirPrivilegios(usuarioId: number, grupoId: number, alvoId: unknown, privilegios: unknown): Promise<boolean> {
+  if (!(await exigirHost(usuarioId, grupoId))) return false;
+  const membro = await membroAlteravel(grupoId, usuarioId, alvoId);
+  await db.update(membrosGrupo).set(lerPrivilegios(privilegios)).where(eq(membrosGrupo.id, membro.id));
+  return true;
+}
+
+/** O host remove um membro: ele passa a ex-membro (mantém leitura do que foi registrado até agora). */
+export async function removerMembro(usuarioId: number, grupoId: number, alvoId: unknown): Promise<boolean> {
+  if (!(await exigirHost(usuarioId, grupoId))) return false;
+  const membro = await membroAlteravel(grupoId, usuarioId, alvoId);
+  await db.update(membrosGrupo).set({ saiuEm: new Date() }).where(eq(membrosGrupo.id, membro.id));
+  return true;
+}
+
+/**
+ * Passa o papel de host a outro membro ativo, que recebe todos os privilégios. O host anterior
+ * continua no grupo com todos os privilégios (o novo host ajusta se quiser) e pode sair sem finalizar.
+ */
+export async function transferirHost(usuarioId: number, grupoId: number, alvoId: unknown): Promise<boolean> {
+  if (!(await exigirHost(usuarioId, grupoId))) return false;
+  const membro = await membroAlteravel(grupoId, usuarioId, alvoId);
+  await db.transaction(async (tx) => {
+    await tx.update(grupos).set({ hostId: membro.usuarioId }).where(eq(grupos.id, grupoId));
+    await tx.update(membrosGrupo).set(TODOS_PRIVILEGIOS).where(eq(membrosGrupo.id, membro.id));
+  });
+  return true;
+}
+
+/**
+ * O usuário sai do grupo e passa a ex-membro (leitura do que foi registrado até a saída).
+ * Se for o host, o grupo é finalizado e fica somente leitura para todos.
+ * Retorna se o grupo foi finalizado, ou null se o usuário não participa (ativamente) do grupo.
+ */
+export async function sairDoGrupo(usuarioId: number, grupoId: number): Promise<{ finalizado: boolean } | null> {
+  const p = await buscarParticipacao(usuarioId, grupoId);
+  if (!p || p.membro.saiuEm) return null;
+  const agora = new Date();
+  const finalizar = p.souHost && !p.grupo.finalizadoEm;
+  await db.transaction(async (tx) => {
+    await tx.update(membrosGrupo).set({ saiuEm: agora }).where(eq(membrosGrupo.id, p.membro.id));
+    if (finalizar) await tx.update(grupos).set({ finalizadoEm: agora }).where(eq(grupos.id, grupoId));
+  });
+  return { finalizado: finalizar };
+}
+
+/** Privilégios efetivos: o host tem todos, independentemente da linha dele. */
+export function privilegiosEfetivos(participacao: NonNullable<Awaited<ReturnType<typeof buscarParticipacao>>>): Privilegios {
+  return participacao.souHost ? TODOS_PRIVILEGIOS : privilegiosDe(participacao.membro);
 }

@@ -12,6 +12,7 @@ import Estrutura from '../../components/Estrutura';
 import Aviso from '../../components/Aviso';
 import Botao, { Spinner } from '../../components/Botao';
 import FormularioManual from './FormularioManual';
+import { podeRegistrarNo, useContexto } from '../../lib/contexto-cliente';
 
 type DadosExtraidos = {
   sucesso?: boolean;
@@ -28,6 +29,7 @@ const campo = 'w-full min-h-11 rounded-lg border border-linha-forte bg-superfici
 
 export default function NovaTransacao() {
   const router = useRouter();
+  const dadosContexto = useContexto();
   const [etapa, setEtapa] = useState<1 | 2>(1);
   // Gasto sem nota fiscal: substitui as duas etapas por um formulário único.
   const [modoManual, setModoManual] = useState(false);
@@ -182,6 +184,22 @@ export default function NovaTransacao() {
     limparFormulario();
     router.push('/');
   };
+
+  // Link direto para cá num grupo em que não pode registrar: explica em vez de deixar falhar ao salvar.
+  if (!podeRegistrarNo(dadosContexto)) {
+    return (
+      <Estrutura>
+        <div className="max-w-md">
+          <h1 className="text-[24px] font-semibold tracking-tight">Registrar compra</h1>
+          <Aviso tipo="info" className="mt-4">
+            {dadosContexto?.contexto.tipo === 'grupo' && dadosContexto.contexto.somenteLeitura
+              ? 'Este grupo está disponível só para consulta.'
+              : 'Você não tem permissão para registrar compras neste grupo. Peça ao host.'}
+          </Aviso>
+        </div>
+      </Estrutura>
+    );
+  }
 
   if (modoManual) {
     return (

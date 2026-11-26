@@ -9,6 +9,7 @@ import Aviso from '../../components/Aviso';
 import Botao, { LinkBotao, Spinner } from '../../components/Botao';
 import { ChevronIcon } from '../../components/icons';
 import type { Item, Transacao } from '../../types';
+import { podeRegistrarNo, useContexto } from '../../lib/contexto-cliente';
 
 type Grupo = { mes: string; total: number; transacoes: Transacao[] };
 
@@ -41,6 +42,7 @@ function ConteudoHistorico() {
   const [erro, setErro] = useState('');
   const [expandidoId, setExpandidoId] = useState<number | null>(null);
   const [busca, setBusca] = useState('');
+  const podeRegistrar = podeRegistrarNo(useContexto());
   const [listaAgentes, setListaAgentes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -113,7 +115,7 @@ function ConteudoHistorico() {
       ) : transacoes.length === 0 ? (
         <div className="mt-6">
           <p className="text-texto-2">Nenhuma compra registrada ainda.</p>
-          <LinkBotao href="/nova-transacao" className="mt-4">Registrar compra</LinkBotao>
+          {podeRegistrar && <LinkBotao href="/nova-transacao" className="mt-4">Registrar compra</LinkBotao>}
         </div>
       ) : (
         <>

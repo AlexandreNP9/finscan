@@ -11,6 +11,7 @@ import { ChevronIcon, CloseIcon } from '../components/icons';
 import type { Transacao } from '../types';
 import EvolucaoMensal, { type PontoMes } from '../components/painel/EvolucaoMensal';
 import RankingBarras from '../components/painel/RankingBarras';
+import { podeRegistrarNo, useContexto } from '../lib/contexto-cliente';
 
 const MAX_CATEGORIAS = 5;
 const MAX_ESTABELECIMENTOS = 5;
@@ -23,6 +24,7 @@ export default function Dashboard() {
   const [erro, setErro] = useState('');
   const [mesSelecionado, setMesSelecionado] = useState('');
   const [categoriaDetalhe, setCategoriaDetalhe] = useState<string | null>(null);
+  const podeRegistrar = podeRegistrarNo(useContexto());
 
   useEffect(() => {
     buscarApi('/api/transacoes')
@@ -167,10 +169,16 @@ export default function Dashboard() {
       <Estrutura>
         <div className="max-w-md py-10 md:py-16">
           <h1 className="text-[24px] font-semibold tracking-tight">Nenhuma compra registrada ainda</h1>
-          <p className="mt-2 text-texto-2">
-            Escaneie o QR Code de uma nota fiscal (NFC-e) e o FinScan lê os itens para você.
-          </p>
-          <LinkBotao href="/nova-transacao" className="mt-6 min-h-12 px-6">Registrar primeira compra</LinkBotao>
+          {podeRegistrar ? (
+            <>
+              <p className="mt-2 text-texto-2">
+                Escaneie o QR Code de uma nota fiscal (NFC-e) e o FinScan lê os itens para você.
+              </p>
+              <LinkBotao href="/nova-transacao" className="mt-6 min-h-12 px-6">Registrar primeira compra</LinkBotao>
+            </>
+          ) : (
+            <p className="mt-2 text-texto-2">Ainda não há compras aqui.</p>
+          )}
         </div>
       </Estrutura>
     );

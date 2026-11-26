@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { buscarApi } from '../lib/cliente';
 import { CheckIcon, ChevronIcon, UserIcon, UsersIcon } from './icons';
+import { useContexto } from '../lib/contexto-cliente';
 
-type Contexto = { tipo: 'pessoal' } | { tipo: 'grupo'; grupoId: number; nome: string };
-type OpcaoGrupo = { grupoId: number; nome: string };
 
 /**
  * Troca o contexto da sessão e recarrega a página (ou vai para `destino`): as telas já visitadas
@@ -35,21 +34,11 @@ export async function alternarContexto(grupoId: number | null, destino?: string)
  * Some para quem não participa de nenhum grupo.
  */
 export default function SeletorContexto() {
-  const [contexto, setContexto] = useState<Contexto | null>(null);
-  const [grupos, setGrupos] = useState<OpcaoGrupo[]>([]);
+  const dados = useContexto();
   const [aberto, setAberto] = useState(false);
   const [trocando, setTrocando] = useState(false);
   const [erro, setErro] = useState('');
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    buscarApi('/api/contexto')
-      .then((res) => res.json())
-      .then((d) => {
-        if (d.sucesso) { setContexto(d.contexto); setGrupos(d.grupos); }
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!aberto) return;
@@ -65,7 +54,11 @@ export default function SeletorContexto() {
     };
   }, [aberto]);
 
-  if (!contexto || (contexto.tipo === 'pessoal' && grupos.length === 0)) return null;
+  if (!dados) return null;
+  const { contexto, grupos } = dados;
+  if (contexto.tipo === 'pessoal' && grupos.length === 0) return null;
+  const ativos = grupos.filter((g) => !g.historico);
+  const historico = grupos.filter((g) => g.historico);
 
   const emGrupo = contexto.tipo === 'grupo';
   const atualId = emGrupo ? contexto.grupoId : null;
@@ -103,7 +96,7 @@ export default function SeletorContexto() {
           <button role="menuitemradio" aria-checked={!emGrupo} type="button" onClick={() => escolher(null)} disabled={trocando} className={item}>
             <UserIcon /> <span className="flex-1 truncate">Conta pessoal</span> {!emGrupo && <CheckIcon />}
           </button>
-          {grupos.map((g) => (
+          {ativos.map((g) => (
             <button
               key={g.grupoId}
               role="menuitemradio"
@@ -116,6 +109,24 @@ export default function SeletorContexto() {
               <UsersIcon /> <span className="flex-1 truncate">{g.nome}</span> {atualId === g.grupoId && <CheckIcon />}
             </button>
           ))}
+          {historico.length > 0 && (
+            <>
+              <p className="px-4 pt-3 pb-1 text-[13px] text-texto-3">Histórico (só consulta)</p>
+              {historico.map((g) => (
+                <button
+                  key={g.grupoId}
+                  role="menuitemradio"
+                  aria-checked={atualId === g.grupoId}
+                  type="button"
+                  onClick={() => escolher(g.grupoId)}
+                  disabled={trocando}
+                  className={`${item} text-texto-2`}
+                >
+                  <UsersIcon /> <span className="flex-1 truncate">{g.nome}</span> {atualId === g.grupoId && <CheckIcon />}
+                </button>
+              ))}
+            </>
+          )}
           {erro && <p role="alert" className="px-4 py-2 text-[13px] text-erro">{erro}</p>}
           <div className="border-t border-linha my-1" />
           <Link role="menuitem" href="/grupos" onClick={() => setAberto(false)} className={`${item} text-texto-2`}>

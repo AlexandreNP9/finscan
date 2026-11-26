@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ButtonHTMLAttributes, ComponentProps } from 'react';
 
-type Variante = 'primario' | 'secundario' | 'discreto';
+type Variante = 'primario' | 'secundario' | 'discreto' | 'perigo' | 'perigoDiscreto';
 
 const BASE =
   'inline-flex items-center justify-center gap-2 rounded-lg font-semibold text-[15px] min-h-11 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
@@ -10,6 +10,10 @@ const VARIANTES: Record<Variante, string> = {
   primario: 'bg-acao text-white hover:bg-acao-escura',
   secundario: 'bg-superficie text-texto border border-linha-forte hover:bg-fundo',
   discreto: 'text-texto-2 hover:text-texto hover:bg-black/5',
+  // Ações destrutivas já confirmadas (ex.: sair e finalizar o grupo).
+  perigo: 'bg-erro text-white hover:opacity-90',
+  // Atalho para uma ação destrutiva que ainda pede confirmação (ex.: "Remover", "Sair do grupo").
+  perigoDiscreto: 'text-erro hover:bg-erro-suave',
 };
 
 export function classeBotao(variante: Variante = 'primario', extra = '') {

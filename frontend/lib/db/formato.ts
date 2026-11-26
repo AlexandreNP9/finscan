@@ -3,6 +3,9 @@
 
 export class ErroValidacao extends Error {}
 
+/** Ação não permitida ao usuário no escopo atual (privilégio de grupo, grupo somente leitura) → 403. */
+export class ErroSemPermissao extends Error {}
+
 /** "1.234,56" | "0,308" | 12.5 → "1234.56" | "0.308" | "12.5". Vazio → null. */
 export function brParaNumeric(valor: unknown, campo: string): string | null {
   if (valor === null || valor === undefined) return null;

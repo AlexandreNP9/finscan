@@ -1,4 +1,5 @@
 import PaginaLista from '../../components/PaginaLista';
+import ObjetivoCategorias from '../../components/ObjetivoCategorias';
 
 export default function GerenciarCategorias() {
   return (
@@ -9,6 +10,8 @@ export default function GerenciarCategorias() {
       rotulo="Nova categoria"
       placeholder="Ex.: Pet Shop"
       vazio="Nenhuma categoria cadastrada."
-    />
+    >
+      <ObjetivoCategorias />
+    </PaginaLista>
   );
 }

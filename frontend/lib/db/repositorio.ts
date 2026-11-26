@@ -65,6 +65,68 @@ export async function acrescentarNomes(tabela: TabelaLista, nomes: string[], usu
     .onConflictDoNothing({ target: [tabela.usuarioId, tabela.nome] });
 }
 
+// ---------- Objetivo do usuário e remapeamento de categorias ----------
+
+const TAMANHO_MAX_OBJETIVO = 300;
+
+export async function lerObjetivo(usuarioId: number): Promise<string> {
+  const [linha] = await db.select({ objetivo: usuarios.objetivo }).from(usuarios).where(eq(usuarios.id, usuarioId));
+  return linha?.objetivo ?? '';
+}
+
+export async function gravarObjetivo(usuarioId: number, objetivo: unknown): Promise<string> {
+  if (typeof objetivo !== 'string') throw new ErroValidacao('O objetivo deve ser um texto.');
+  const limpo = objetivo.trim();
+  if (limpo.length > TAMANHO_MAX_OBJETIVO) {
+    throw new ErroValidacao(`O objetivo pode ter no máximo ${TAMANHO_MAX_OBJETIVO} caracteres.`);
+  }
+  await db.update(usuarios).set({ objetivo: limpo }).where(eq(usuarios.id, usuarioId));
+  return limpo;
+}
+
+export type ItemCategorizado = { id: number; descricao: string; categoria: string };
+
+/**
+ * Itens já categorizados do usuário (os mais recentes primeiro), exceto os da categoria
+ * informada: candidatos a serem movidos para ela.
+ */
+export async function listarItensCategorizados(usuarioId: number, excetoCategoria: string, limite: number): Promise<ItemCategorizado[]> {
+  return db
+    .select({ id: itens.id, descricao: itens.descricao, categoria: categorias.nome })
+    .from(itens)
+    .innerJoin(transacoes, eq(itens.transacaoId, transacoes.id))
+    .innerJoin(categorias, eq(itens.categoriaId, categorias.id))
+    .where(and(eq(transacoes.usuarioId, usuarioId), sql`${categorias.nome} <> ${excetoCategoria}`))
+    .orderBy(desc(transacoes.dataEmissao), desc(itens.id))
+    .limit(limite);
+}
+
+/** Move itens do usuário para uma categoria dele. Ids de outros usuários são ignorados. */
+export async function moverItensParaCategoria(usuarioId: number, idsItens: unknown, nomeCategoria: unknown): Promise<number> {
+  if (!Array.isArray(idsItens) || idsItens.some((id) => !Number.isInteger(id))) {
+    throw new ErroValidacao('"itens" deve ser uma lista de ids.');
+  }
+  const nome = texto(nomeCategoria);
+  const [categoria] = await db
+    .select({ id: categorias.id })
+    .from(categorias)
+    .where(and(eq(categorias.usuarioId, usuarioId), eq(categorias.nome, nome)));
+  if (!categoria) throw new ErroValidacao(`Categoria "${nome}" não está cadastrada.`);
+  if (idsItens.length === 0) return 0;
+
+  const movidos = await db
+    .update(itens)
+    .set({ categoriaId: categoria.id })
+    .where(
+      and(
+        inArray(itens.id, idsItens as number[]),
+        inArray(itens.transacaoId, db.select({ id: transacoes.id }).from(transacoes).where(eq(transacoes.usuarioId, usuarioId))),
+      ),
+    )
+    .returning({ id: itens.id });
+  return movidos.length;
+}
+
 // ---------- Transações ----------
 
 /** Transações do usuário (as mais recentes primeiro). */

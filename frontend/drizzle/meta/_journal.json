@@ -22,6 +22,13 @@
       "when": 1795647832362,
       "tag": "0002_categorias_agentes_por_usuario",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795664431641,
+      "tag": "0003_objetivo_usuario",
+      "breakpoints": true
     }
   ]
 }

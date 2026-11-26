@@ -37,6 +37,9 @@ export const usuarios = pgTable('usuarios', {
   nome: text('nome').notNull(),
   email: text('email').notNull().unique(),
   senhaHash: text('senha_hash').notNull(),
+  // Objetivo do usuário com as categorias (ex.: "separar o essencial do supérfluo"), definido em
+  // /categorias. Vai no prompt da IA para orientar sugestões de categorias novas. '' = não definido.
+  objetivo: text('objetivo').notNull().default(''),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import type { Item } from '../../../types';
 import { bloquearSemLogin } from '../../../lib/api';
 
 export async function POST(request: Request) {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     const $ = cheerio.load(html);
 
     // --- 1. EXTRAÇÃO DOS ITENS ---
-    const itens: any[] = [];
+    const itens: Item[] = [];
     $('#tabResult tr').each((i, elemento) => {
       const descricao = $(elemento).find('.txtTit2').text().trim();
       const codigo = $(elemento).find('.RCod').text().replace(/\D/g, '').trim();

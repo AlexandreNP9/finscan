@@ -1,5 +1,6 @@
-// Categorias criadas para cada conta nova (em `criarUsuario`), para o usuário já poder categorizar.
-// Ele pode editar a lista depois em /categorias.
+// Categorias criadas para cada conta nova (em `criarUsuario`) e cada grupo novo (em `criarGrupo`),
+// para já ser possível categorizar.
+// A lista pode ser editada depois em /categorias.
 export const CATEGORIAS_PADRAO = [
   'Mercearia Básica',
   'Hortifruti',
@@ -21,5 +22,9 @@ export const CATEGORIAS_PADRAO = [
   'Papelaria',
   'Automotivo',
   'Vestuário',
+  // Gastos sem nota fiscal, comuns no preenchimento manual.
+  'Moradia',
+  'Contas da casa',
+  'Doações',
   'Outros',
 ];

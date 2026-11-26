@@ -36,6 +36,13 @@
       "when": 1795665578572,
       "tag": "0004_grupos",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795666232023,
+      "tag": "0005_grupo_ativo_sessao",
+      "breakpoints": true
     }
   ]
 }

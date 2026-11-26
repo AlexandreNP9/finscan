@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import MenuUsuario from './MenuUsuario';
+import SeletorContexto from './SeletorContexto';
 import { classeBotao } from './Botao';
 import { HomeIcon, ListIcon, PlusIcon, TagIcon } from './icons';
 
@@ -38,8 +39,9 @@ export default function Estrutura({ children, pendentes, semNavInferior }: Props
   return (
     <div className="flex-1 flex flex-col">
       <header className="sticky top-0 z-30 bg-fundo border-b border-linha" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="mx-auto w-full max-w-5xl h-16 px-4 md:px-6 flex items-center gap-6">
+        <div className="mx-auto w-full max-w-5xl h-16 px-4 md:px-6 flex items-center gap-3 md:gap-6">
           <Link href="/" className="text-[17px] font-semibold tracking-tight">FinScan</Link>
+          <SeletorContexto />
 
           <nav aria-label="Principal" className="hidden md:flex items-center gap-1">
             {LINKS.map((l) => (

@@ -7,6 +7,7 @@ import Aviso from '../../components/Aviso';
 import Botao, { Spinner } from '../../components/Botao';
 import { ChevronIcon } from '../../components/icons';
 import type { DetalheGrupo, ResumoGrupo } from '../../lib/db/grupos';
+import { alternarContexto } from '../../components/SeletorContexto';
 
 const campo = 'w-full min-h-11 rounded-lg border border-linha-forte bg-superficie px-3 text-[15px] outline-none focus:border-acao';
 
@@ -118,6 +119,13 @@ function DetalhesGrupo({ id }: { id: number }) {
   const [erro, setErro] = useState('');
   const [copiado, setCopiado] = useState(false);
   const [gerando, setGerando] = useState(false);
+  const [abrindo, setAbrindo] = useState(false);
+
+  const abrirGrupo = async () => {
+    setAbrindo(true);
+    const falha = await alternarContexto(id, '/');
+    if (falha) { setErro(falha); setAbrindo(false); return; }
+  };
 
   useEffect(() => {
     buscarApi(`/api/grupos/${id}`)
@@ -156,6 +164,14 @@ function DetalhesGrupo({ id }: { id: number }) {
 
   return (
     <div className="pb-5 space-y-5">
+      {!grupo.saiu && !grupo.finalizado && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Botao onClick={abrirGrupo} disabled={abrindo}>
+            {abrindo ? <><Spinner /> Abrindo…</> : 'Abrir este grupo'}
+          </Botao>
+          <span className="text-[13px] text-texto-3">As telas passam a mostrar as compras do grupo.</span>
+        </div>
+      )}
       {grupo.codigoConvite && (
         <div className="rounded-lg bg-black/[0.03] p-4">
           <p className="text-[13px] text-texto-3">Código de convite</p>

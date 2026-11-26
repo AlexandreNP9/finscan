@@ -59,6 +59,8 @@ export const sessoes = pgTable(
       .notNull()
       .references(() => usuarios.id, { onDelete: 'cascade' }),
     expiraEm: timestamp('expira_em', { withTimezone: true }).notNull(),
+    // Contexto escolhido nesta sessão: null = conta pessoal; senão, o grupo que as telas mostram.
+    grupoAtivoId: integer('grupo_ativo_id').references((): AnyPgColumn => grupos.id, { onDelete: 'set null' }),
     criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('sessoes_usuario_id_idx').on(t.usuarioId)],

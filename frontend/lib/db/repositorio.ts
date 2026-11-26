@@ -309,6 +309,64 @@ export async function atualizarTransacao(payload: unknown, escopo: Escopo): Prom
   });
 }
 
+export type ResumoNovasCategorias = {
+  /** Contas pessoais e grupos ativos analisados. */
+  donos: number;
+  /** Donos que receberam pelo menos uma categoria, com os nomes acrescentados. */
+  alterados: { dono: string; nomes: string[] }[];
+};
+
+/**
+ * Acrescenta categorias às listas que ainda não as têm: todas as contas pessoais e todos os
+ * grupos ativos (finalizados são histórico e ficam como estão). Entram antes de "Outros", se a
+ * lista tiver "Outros"; senão, no fim. Nomes que o dono já tem são pulados, então rodar de novo
+ * não duplica nada. Com `simular`, só calcula o que seria feito. Uso: script db:categorias-padrao.
+ */
+export async function acrescentarCategoriasAosExistentes(nomes: string[], simular: boolean): Promise<ResumoNovasCategorias> {
+  const limpos = [...new Set(nomes.map((n) => n.trim()).filter(Boolean))];
+  const contas = await db.select({ id: usuarios.id, nome: usuarios.nome, email: usuarios.email }).from(usuarios).orderBy(asc(usuarios.id));
+  const gruposAtivos = await db
+    .select({ id: grupos.id, nome: grupos.nome })
+    .from(grupos)
+    .where(isNull(grupos.finalizadoEm))
+    .orderBy(asc(grupos.id));
+  const donos: { rotulo: string; escopo: Escopo }[] = [
+    ...contas.map((u) => ({ rotulo: `conta ${u.nome} <${u.email}>`, escopo: escopoPessoal(u.id) })),
+    // Escopo "administrativo" do grupo: listas de grupo só usam `grupoId` (usuarioId não é lido).
+    ...gruposAtivos.map((g) => ({
+      rotulo: `grupo "${g.nome}"`,
+      escopo: { tipo: 'grupo', usuarioId: 0, grupoId: g.id, privilegios: { podeRegistrar: true, podeEditarTodas: true, podeGerenciarListas: true, podeConvidar: true }, somenteLeitura: false, ate: null } as Escopo,
+    })),
+  ];
+
+  const alterados: ResumoNovasCategorias['alterados'] = [];
+  for (const { rotulo, escopo } of donos) {
+    await db.transaction(async (tx) => {
+      const atuais = await tx
+        .select({ id: categorias.id, nome: categorias.nome })
+        .from(categorias)
+        .where(doEscopo(categorias, escopo))
+        .orderBy(asc(categorias.ordem), asc(categorias.id));
+      const existentes = new Set(atuais.map((c) => c.nome));
+      const faltando = limpos.filter((n) => !existentes.has(n));
+      if (faltando.length === 0) return;
+      alterados.push({ dono: rotulo, nomes: faltando });
+      if (simular) return;
+
+      // Nova ordem: as atuais com as novas encaixadas antes de "Outros" (ou no fim).
+      const posOutros = atuais.findIndex((c) => c.nome === 'Outros');
+      const corte = posOutros === -1 ? atuais.length : posOutros;
+      const ordem = [...atuais.slice(0, corte).map((c) => c.nome), ...faltando, ...atuais.slice(corte).map((c) => c.nome)];
+
+      await tx.insert(categorias).values(faltando.map((nome) => ({ ...donoDaLista(escopo), nome, ordem: ordem.indexOf(nome) })));
+      for (const c of atuais) {
+        await tx.update(categorias).set({ ordem: ordem.indexOf(c.nome) }).where(eq(categorias.id, c.id));
+      }
+    });
+  }
+  return { donos: donos.length, alterados };
+}
+
 export type ResumoAtribuicao = {
   categorias: { vinculadas: number; mescladas: number };
   agentes: { vinculados: number; mesclados: number };

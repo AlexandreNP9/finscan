@@ -49,6 +49,8 @@ export default function Dashboard() {
     [transacoes],
   );
 
+  const semFonte = useMemo(() => transacoes.filter((t) => !t.agenteOrigem).length, [transacoes]);
+
   const { totalMes, qtdCompras, categorias, semCategoria } = useMemo(() => {
     let total = 0;
     let compras = 0;
@@ -156,6 +158,15 @@ export default function Dashboard() {
             {pendentes} {pendentes === 1 ? 'nota tem' : 'notas têm'} itens sem categoria.
           </span>
           <Link href="/categorizar" className="font-semibold underline underline-offset-2">Categorizar agora</Link>
+        </Aviso>
+      )}
+
+      {semFonte > 0 && (
+        <Aviso tipo="alerta" className={`${pendentes > 0 ? 'mt-3' : 'mt-6'} flex flex-wrap items-center justify-between gap-x-4 gap-y-1`}>
+          <span>
+            {semFonte} {semFonte === 1 ? 'compra está' : 'compras estão'} sem fonte pagadora.
+          </span>
+          <Link href="/historico?semFonte=1" className="font-semibold underline underline-offset-2">Definir agora</Link>
         </Aviso>
       )}
 

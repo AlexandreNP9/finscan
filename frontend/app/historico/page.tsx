@@ -1,24 +1,50 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { buscarApi } from '../../lib/cliente';
 import { formatarBRL, formatarData, nomeMes, paraNumero } from '../../lib/moeda';
 import Estrutura from '../../components/Estrutura';
 import Aviso from '../../components/Aviso';
-import { LinkBotao } from '../../components/Botao';
+import Botao, { LinkBotao, Spinner } from '../../components/Botao';
 import { ChevronIcon } from '../../components/icons';
 import type { Item, Transacao } from '../../types';
 
 type Grupo = { mes: string; total: number; transacoes: Transacao[] };
 
+// useSearchParams exige um limite de Suspense para a rota continuar pré-renderizada.
 export default function Historico() {
+  return (
+    <Suspense
+      fallback={
+        <Estrutura>
+          <h1 className="text-[24px] font-semibold tracking-tight">Histórico</h1>
+          <p className="mt-6 text-texto-3">Carregando…</p>
+        </Estrutura>
+      }
+    >
+      <ConteudoHistorico />
+    </Suspense>
+  );
+}
+
+function ConteudoHistorico() {
+  const router = useRouter();
+  // ?semFonte=1 (link do dashboard): mostra só as compras sem fonte pagadora.
+  const soSemFonte = useSearchParams().get('semFonte') === '1';
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [usuarioAtual, setUsuarioAtual] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [erro, setErro] = useState('');
   const [expandidoId, setExpandidoId] = useState<number | null>(null);
+  const [listaAgentes, setListaAgentes] = useState<string[]>([]);
 
   useEffect(() => {
+    buscarApi('/api/agentes')
+      .then((res) => res.json())
+      .then((data) => data.sucesso && setListaAgentes(data.agentes))
+      .catch(() => {});
+
     buscarApi('/api/transacoes')
       .then((res) => res.json())
       .then((data) => {
@@ -40,9 +66,12 @@ export default function Historico() {
       .catch(() => {});
   }, []);
 
+  const semFonte = transacoes.filter((t) => !t.agenteOrigem).length;
+
   const grupos = useMemo(() => {
     const porMes = new Map<string, Grupo>();
     for (const t of transacoes) {
+      if (soSemFonte && t.agenteOrigem) continue;
       const mes = t.dataEmissao.substring(0, 7);
       const g = porMes.get(mes) ?? { mes, total: 0, transacoes: [] };
       g.total += paraNumero(t.valorTotal);
@@ -50,14 +79,19 @@ export default function Historico() {
       porMes.set(mes, g);
     }
     return Array.from(porMes.values());
-  }, [transacoes]);
+  }, [transacoes, soSemFonte]);
 
   const pendentes = transacoes.filter((t) => t.items?.some((i) => i.categoria === '')).length;
   const alternar = (id: number) => setExpandidoId(expandidoId === id ? null : id);
 
+  const mostrarTodas = () => router.replace('/historico');
+
+  const aoSalvarFonte = (atualizada: Transacao) =>
+    setTransacoes((lista) => lista.map((t) => (t.id === atualizada.id ? atualizada : t)));
+
   /** "Registrado por" só interessa quando foi outra pessoa. */
   const detalhes = (t: Transacao) =>
-    [t.agenteOrigem, t.usuario && t.usuario !== usuarioAtual ? `por ${t.usuario}` : ''].filter(Boolean).join(' · ');
+    [t.agenteOrigem || 'sem fonte pagadora', t.usuario && t.usuario !== usuarioAtual ? `por ${t.usuario}` : ''].filter(Boolean).join(' · ');
 
   return (
     <Estrutura pendentes={pendentes}>
@@ -73,7 +107,20 @@ export default function Historico() {
           <LinkBotao href="/nova-transacao" className="mt-4">Registrar compra</LinkBotao>
         </div>
       ) : (
-        grupos.map((g) => (
+        <>
+        {soSemFonte && (
+          <Aviso tipo={semFonte > 0 ? 'alerta' : 'sucesso'} className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <span>
+              {semFonte > 0
+                ? `${semFonte} ${semFonte === 1 ? 'compra' : 'compras'} sem fonte pagadora. Abra cada uma para definir.`
+                : 'Todas as compras têm fonte pagadora.'}
+            </span>
+            <button type="button" onClick={mostrarTodas} className="font-semibold underline underline-offset-2">
+              Mostrar todas
+            </button>
+          </Aviso>
+        )}
+        {grupos.map((g) => (
           <section key={g.mes} aria-labelledby={`mes-${g.mes}`} className="mt-8">
             <div className="flex items-baseline justify-between gap-4 pb-2 border-b border-linha-forte">
               <h2 id={`mes-${g.mes}`} className="text-[15px] font-semibold first-letter:uppercase">{nomeMes(g.mes)}</h2>
@@ -113,6 +160,7 @@ export default function Historico() {
                       <tr className="border-b border-linha">
                         <td></td>
                         <td colSpan={4} className="pb-4 pt-1">
+                          <EditarFonte transacao={t} agentes={listaAgentes} aoSalvar={aoSalvarFonte} />
                           <TabelaItens itens={t.items} />
                         </td>
                       </tr>
@@ -142,6 +190,7 @@ export default function Historico() {
                   </button>
                   {expandidoId === t.id && (
                     <div className="pb-4">
+                      <EditarFonte transacao={t} agentes={listaAgentes} aoSalvar={aoSalvarFonte} />
                       <TabelaItens itens={t.items} />
                     </div>
                   )}
@@ -149,9 +198,72 @@ export default function Historico() {
               ))}
             </ul>
           </section>
-        ))
+        ))}
+        </>
       )}
     </Estrutura>
+  );
+}
+
+const campo = 'min-h-11 rounded-lg border border-linha-forte bg-superficie pl-3 pr-9 text-[15px] outline-none focus:border-acao appearance-none';
+
+function EditarFonte({ transacao, agentes, aoSalvar }: { transacao: Transacao; agentes: string[]; aoSalvar: (t: Transacao) => void }) {
+  const [escolhida, setEscolhida] = useState(transacao.agenteOrigem);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const idCampo = `fonte-${transacao.id}`;
+
+  const salvar = async () => {
+    setSalvando(true);
+    setErro('');
+    const atualizada = { ...transacao, agenteOrigem: escolhida };
+    try {
+      // O PUT substitui a transação inteira (itens ausentes seriam apagados), então vai tudo.
+      const res = await buscarApi('/api/transacoes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(atualizada),
+      });
+      if (res.ok) {
+        aoSalvar(atualizada);
+      } else {
+        const data = await res.json().catch(() => null);
+        setErro(data?.erro || 'Não foi possível salvar.');
+      }
+    } catch {
+      setErro('Erro de conexão.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // Fonte cadastrada antes e depois excluída continua aparecendo como opção atual.
+  const opcoes = transacao.agenteOrigem && !agentes.includes(transacao.agenteOrigem) ? [transacao.agenteOrigem, ...agentes] : agentes;
+
+  return (
+    <div className="mb-3">
+      <label htmlFor={idCampo} className="block text-[13px] text-texto-3">Pago com</label>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <select id={idCampo} value={escolhida} onChange={(e) => setEscolhida(e.target.value)} className={campo}>
+            <option value="">Sem fonte pagadora</option>
+            {opcoes.map((ag) => <option key={ag} value={ag}>{ag}</option>)}
+          </select>
+          <ChevronIcon className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-texto-3" />
+        </div>
+        {escolhida !== transacao.agenteOrigem && (
+          <Botao onClick={salvar} disabled={salvando}>
+            {salvando ? <><Spinner /> Salvando…</> : 'Salvar'}
+          </Botao>
+        )}
+      </div>
+      {agentes.length === 0 && (
+        <p className="mt-1 text-[13px] text-texto-3">
+          Nenhuma fonte pagadora cadastrada. <a href="/agentes" className="text-acao underline underline-offset-2">Cadastrar</a>
+        </p>
+      )}
+      {erro && <p role="alert" className="mt-1 text-[13px] text-erro">{erro}</p>}
+    </div>
   );
 }
 

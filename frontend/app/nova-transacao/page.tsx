@@ -37,7 +37,6 @@ export default function NovaTransacao() {
   const [isSaving, setIsSaving] = useState(false);
   const [erroCaptura, setErroCaptura] = useState('');
   const [erroSalvar, setErroSalvar] = useState('');
-  const [erroAgente, setErroAgente] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,7 +48,8 @@ export default function NovaTransacao() {
   const [estabelecimentoNota, setEstabelecimentoNota] = useState('');
   const [dataEmissao, setDataEmissao] = useState('');
   const [horaEmissao, setHoraEmissao] = useState('');
-  const [agenteOrigem, setAgenteOrigem] = useState('');
+  // null = o usuário ainda não mexeu no campo; '' = escolheu "definir depois".
+  const [agenteOrigem, setAgenteOrigem] = useState<string | null>(null);
 
   const [listaAgentes, setListaAgentes] = useState<string[]>([]);
   const [agentesCarregados, setAgentesCarregados] = useState(false);
@@ -68,8 +68,8 @@ export default function NovaTransacao() {
     return () => window.removeEventListener('focus', carregarAgentes);
   }, []);
 
-  // Com uma única fonte pagadora, ela já vem selecionada.
-  const agenteEscolhido = agenteOrigem || (listaAgentes.length === 1 ? listaAgentes[0] : '');
+  // Com uma única fonte pagadora, ela já vem selecionada (até o usuário escolher outra coisa).
+  const agenteEscolhido = agenteOrigem ?? (listaAgentes.length === 1 ? listaAgentes[0] : '');
 
   const falhaCaptura = (mensagem: string) => {
     setErroCaptura(mensagem);
@@ -133,19 +133,17 @@ export default function NovaTransacao() {
     setIsSaving(false);
     setErroCaptura('');
     setErroSalvar('');
-    setErroAgente(false);
     setItems([]);
     setChaveAcesso('');
     setValorTotal('');
     setEstabelecimentoNota('');
     setDataEmissao('');
     setHoraEmissao('');
-    setAgenteOrigem('');
+    setAgenteOrigem(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const salvarTransacao = async () => {
-    if (!agenteEscolhido) { setErroAgente(true); return; }
     setIsSaving(true);
     setErroSalvar('');
     const payload = { chaveAcesso, valorTotal, desconto, estabelecimento: estabelecimentoNota, dataEmissao, horaEmissao, agenteOrigem: agenteEscolhido, items };
@@ -258,16 +256,16 @@ export default function NovaTransacao() {
                 <select
                   id="agente"
                   value={agenteEscolhido}
-                  onChange={e => { setAgenteOrigem(e.target.value); setErroAgente(false); }}
-                  aria-invalid={erroAgente}
-                  className={`${campo} appearance-none pr-9 ${erroAgente ? 'border-erro' : ''}`}
+                  onChange={e => setAgenteOrigem(e.target.value)}
+                  aria-describedby="agente-dica"
+                  className={`${campo} appearance-none pr-9`}
                 >
-                  <option value="" disabled>Selecione…</option>
+                  <option value="">Definir depois</option>
                   {listaAgentes.map(ag => <option key={ag} value={ag}>{ag}</option>)}
                 </select>
                 <ChevronIcon className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-texto-3" />
               </div>
-              {erroAgente && <p role="alert" className="mt-1.5 text-[13px] text-erro">Escolha de onde saiu o dinheiro.</p>}
+              <p id="agente-dica" className="mt-1.5 text-[13px] text-texto-3">Não lembra? Salve assim e defina depois pelo histórico.</p>
               {agentesCarregados && listaAgentes.length === 0 && (
                 <Aviso tipo="alerta" className="mt-3">
                   Você ainda não cadastrou nenhuma fonte pagadora.{' '}

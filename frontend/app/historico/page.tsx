@@ -1,102 +1,189 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { buscarApi } from '../../lib/cliente';
-import { BackIcon, ReceiptIcon } from '../../components/icons';
-import { Item } from '../../types';
+import { formatarBRL, formatarData, nomeMes, paraNumero } from '../../lib/moeda';
+import Estrutura from '../../components/Estrutura';
+import Aviso from '../../components/Aviso';
+import { LinkBotao } from '../../components/Botao';
+import { ChevronIcon } from '../../components/icons';
+import type { Item, Transacao } from '../../types';
+
+type Grupo = { mes: string; total: number; transacoes: Transacao[] };
 
 export default function Historico() {
-  const [transacoes, setTransacoes] = useState<any[]>([]);
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [usuarioAtual, setUsuarioAtual] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [erro, setErro] = useState('');
   const [expandidoId, setExpandidoId] = useState<number | null>(null);
 
   useEffect(() => {
     buscarApi('/api/transacoes')
-      .then(res => res.json())
-      .then(data => {
-        if (data.sucesso) {
-          // Garante que as mais recentes fiquem no topo
-          const ordenadas = data.transacoes.sort((a: any, b: any) => 
-            new Date(b.dataEmissao).getTime() - new Date(a.dataEmissao).getTime()
-          );
-          setTransacoes(ordenadas);
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.sucesso) {
+          setErro(data.erro || 'Não foi possível carregar o histórico.');
+          return;
         }
-        setIsLoading(false);
-      });
+        const ordenadas = [...data.transacoes].sort((a: Transacao, b: Transacao) =>
+          (b.dataEmissao + b.horaEmissao).localeCompare(a.dataEmissao + a.horaEmissao),
+        );
+        setTransacoes(ordenadas);
+      })
+      .catch(() => setErro('Erro de conexão.'))
+      .finally(() => setIsLoading(false));
+
+    buscarApi('/api/auth/sessao')
+      .then((res) => res.json())
+      .then((data) => data.sucesso && setUsuarioAtual(data.usuario.nome))
+      .catch(() => {});
   }, []);
 
-  const toggleExpandir = (id: number) => {
-    setExpandidoId(expandidoId === id ? null : id);
-  };
+  const grupos = useMemo(() => {
+    const porMes = new Map<string, Grupo>();
+    for (const t of transacoes) {
+      const mes = t.dataEmissao.substring(0, 7);
+      const g = porMes.get(mes) ?? { mes, total: 0, transacoes: [] };
+      g.total += paraNumero(t.valorTotal);
+      g.transacoes.push(t);
+      porMes.set(mes, g);
+    }
+    return Array.from(porMes.values());
+  }, [transacoes]);
+
+  const pendentes = transacoes.filter((t) => t.items?.some((i) => i.categoria === '')).length;
+  const alternar = (id: number) => setExpandidoId(expandidoId === id ? null : id);
+
+  /** "Registrado por" só interessa quando foi outra pessoa. */
+  const detalhes = (t: Transacao) =>
+    [t.agenteOrigem, t.usuario && t.usuario !== usuarioAtual ? `por ${t.usuario}` : ''].filter(Boolean).join(' · ');
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] flex justify-center md:items-start md:py-10">
-      <div className="w-full max-w-[430px] md:max-w-[960px] bg-white md:rounded-2xl md:shadow-lg overflow-hidden flex flex-col min-h-screen md:min-h-[85vh]">
-        
-        <header className="sticky top-0 z-20 bg-white border-b border-[#e8eaed] px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="w-10 h-10 flex items-center justify-center rounded-xl text-[#6b7280] hover:bg-[#f4f5f7] transition-colors">
-            <BackIcon />
-          </Link>
-          <div className="flex items-center gap-2">
-            <ReceiptIcon />
-            <h1 className="text-[16px] font-bold text-[#111827]">Histórico de Lançamentos</h1>
-          </div>
-          <div className="w-10"></div>
-        </header>
+    <Estrutura pendentes={pendentes}>
+      <h1 className="text-[24px] font-semibold tracking-tight">Histórico</h1>
 
-        <div className="flex-1 overflow-y-auto bg-[#f9fafb] p-4 md:p-6">
-          {isLoading ? (
-            <p className="text-center text-[#9ca3af] mt-10">Carregando histórico...</p>
-          ) : transacoes.length === 0 ? (
-            <div className="text-center mt-10">
-              <p className="text-[#6b7280]">Nenhuma transação registrada ainda.</p>
+      {isLoading ? (
+        <p className="mt-6 text-texto-3">Carregando…</p>
+      ) : erro ? (
+        <Aviso tipo="erro" className="mt-6">{erro}</Aviso>
+      ) : transacoes.length === 0 ? (
+        <div className="mt-6">
+          <p className="text-texto-2">Nenhuma compra registrada ainda.</p>
+          <LinkBotao href="/nova-transacao" className="mt-4">Registrar compra</LinkBotao>
+        </div>
+      ) : (
+        grupos.map((g) => (
+          <section key={g.mes} aria-labelledby={`mes-${g.mes}`} className="mt-8">
+            <div className="flex items-baseline justify-between gap-4 pb-2 border-b border-linha-forte">
+              <h2 id={`mes-${g.mes}`} className="text-[15px] font-semibold first-letter:uppercase">{nomeMes(g.mes)}</h2>
+              <span className="valor text-[15px] font-semibold">{formatarBRL(g.total)}</span>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {transacoes.map((t) => (
-                <div key={t.id} className="bg-white border border-[#e8eaed] rounded-xl overflow-hidden shadow-sm transition-all">
-                  {/* Cabeçalho do Card (Clicável) */}
-                  <button 
-                    onClick={() => toggleExpandir(t.id)}
-                    className="w-full px-4 py-4 flex items-center justify-between text-left hover:bg-[#f9fafb] active:bg-[#f4f5f7] transition-colors"
-                  >
-                    <div>
-                      <p className="text-[14px] font-bold text-[#111827]">{t.estabelecimento || 'Estabelecimento Desconhecido'}</p>
-                      <p className="text-[11px] text-[#6b7280] mt-0.5">
-                        {t.dataEmissao.split('-').reverse().join('/')} {t.horaEmissao && `às ${t.horaEmissao}`} • {t.agenteOrigem}
-                        {t.usuario && ` • Registrado por ${t.usuario}`}
-                      </p>
-                    </div>
-                    <div className="text-right flex items-center gap-3">
-                      <p className="text-[14px] font-bold text-[#111827] font-mono">R$ {t.valorTotal}</p>
-                      <svg className={`text-[#9ca3af] transition-transform ${expandidoId === t.id ? 'rotate-180' : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-                    </div>
-                  </button>
 
-                  {/* Detalhes Expandidos (Itens) */}
+            {/* Desktop: tabela */}
+            <table className="hidden md:table w-full text-[15px]">
+              <thead className="sr-only">
+                <tr><th>Data</th><th>Estabelecimento</th><th>Pago com</th><th>Valor</th><th></th></tr>
+              </thead>
+              <tbody>
+                {g.transacoes.map((t) => (
+                  <Fragment key={t.id}>
+                    <tr
+                      onClick={() => alternar(t.id)}
+                      className="border-b border-linha cursor-pointer hover:bg-black/[0.02]"
+                    >
+                      <td className="py-3 pr-4 w-28 text-texto-2 tabular-nums">{formatarData(t.dataEmissao)}</td>
+                      <td className="py-3 pr-4">
+                        <button
+                          type="button"
+                          aria-expanded={expandidoId === t.id}
+                          onClick={(e) => { e.stopPropagation(); alternar(t.id); }}
+                          className="text-left hover:underline underline-offset-2"
+                        >
+                          {t.estabelecimento || 'Estabelecimento desconhecido'}
+                        </button>
+                      </td>
+                      <td className="py-3 pr-4 text-texto-3">{detalhes(t)}</td>
+                      <td className="py-3 valor font-medium">{formatarBRL(t.valorTotal)}</td>
+                      <td className="py-3 pl-2 w-8 text-texto-3">
+                        <ChevronIcon className={`transition-transform ${expandidoId === t.id ? 'rotate-180' : ''}`} />
+                      </td>
+                    </tr>
+                    {expandidoId === t.id && (
+                      <tr className="border-b border-linha">
+                        <td></td>
+                        <td colSpan={4} className="pb-4 pt-1">
+                          <TabelaItens itens={t.items} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Mobile: lista */}
+            <ul className="md:hidden divide-y divide-linha">
+              {g.transacoes.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => alternar(t.id)}
+                    aria-expanded={expandidoId === t.id}
+                    className="w-full py-3 text-left"
+                  >
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="text-[15px] truncate">{t.estabelecimento || 'Estabelecimento desconhecido'}</span>
+                      <span className="valor text-[15px] font-medium">{formatarBRL(t.valorTotal)}</span>
+                    </span>
+                    <span className="block text-[13px] text-texto-3 truncate">
+                      {formatarData(t.dataEmissao)}{detalhes(t) && ` · ${detalhes(t)}`}
+                    </span>
+                  </button>
                   {expandidoId === t.id && (
-                    <div className="px-4 pb-4 pt-2 border-t border-[#f4f5f7] bg-[#fafafa]">
-                      <p className="text-[10px] font-bold text-[#6b7280] uppercase tracking-widest mb-2">Itens da Compra</p>
-                      <div className="space-y-2">
-                        {t.items?.map((item: Item, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center bg-white border border-[#e8eaed] p-2 rounded-lg">
-                            <div className="flex-1 min-w-0 pr-2">
-                              <p className="text-[11px] font-semibold text-[#374151] truncate">{item.descricao}</p>
-                              <p className="text-[9px] text-[#9ca3af]">{item.qtd} {item.un} x R$ {item.vlUnit} {item.categoria && `• ${item.categoria}`}</p>
-                            </div>
-                            <p className="text-[11px] font-bold text-[#111827] font-mono">R$ {item.vlTotal}</p>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="pb-4">
+                      <TabelaItens itens={t.items} />
                     </div>
                   )}
-                </div>
+                </li>
               ))}
-            </div>
-          )}
-        </div>
-      </div>
+            </ul>
+          </section>
+        ))
+      )}
+    </Estrutura>
+  );
+}
+
+function TabelaItens({ itens }: { itens: Item[] }) {
+  return (
+    <div className="overflow-x-auto rounded-lg bg-black/[0.03] px-3">
+      <table className="w-full text-[14px]">
+        <thead>
+          <tr className="text-[13px] text-texto-3 text-left">
+            <th className="py-2 pr-3 font-medium">Item</th>
+            <th className="py-2 pr-3 font-medium hidden sm:table-cell">Categoria</th>
+            <th className="py-2 font-medium text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-linha">
+          {itens.map((item) => (
+            <tr key={item.id}>
+              <td className="py-2 pr-3">
+                <span className="block">{item.descricao}</span>
+                <span className="block text-[13px] text-texto-3 tabular-nums">
+                  {item.qtd} {item.un} × {formatarBRL(item.vlUnit)}
+                  <span className="sm:hidden">{item.categoria ? ` · ${item.categoria}` : ''}</span>
+                </span>
+              </td>
+              <td className="py-2 pr-3 hidden sm:table-cell text-texto-2">
+                {item.categoria || <span className="text-alerta">Sem categoria</span>}
+              </td>
+              <td className="py-2 valor align-top">{formatarBRL(item.vlTotal)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

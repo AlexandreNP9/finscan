@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { destinoPosLogin } from '../lib/cliente';
+import Aviso from './Aviso';
+import Botao, { Spinner } from './Botao';
 
 type Modo = 'login' | 'cadastro';
 
@@ -11,21 +13,21 @@ const TEXTOS: Record<Modo, { titulo: string; subtitulo: string; botao: string; e
     titulo: 'Entrar',
     subtitulo: 'Acesse sua conta para ver suas finanças.',
     botao: 'Entrar',
-    enviando: 'Entrando...',
+    enviando: 'Entrando…',
     rota: '/api/auth/login',
   },
   cadastro: {
     titulo: 'Criar conta',
     subtitulo: 'Cadastre-se para registrar suas notas fiscais.',
     botao: 'Criar conta',
-    enviando: 'Criando conta...',
+    enviando: 'Criando conta…',
     rota: '/api/auth/cadastro',
   },
 };
 
 const classeInput =
-  'w-full border border-[#e2e5ea] rounded-lg bg-[#f9fafb] text-[#111827] text-sm px-3 py-2.5 outline-none focus:border-[#1d4ed8] focus:bg-white transition-all';
-const classeLabel = 'block text-[10px] font-semibold text-[#6b7280] mb-2 tracking-widest uppercase';
+  'w-full min-h-11 rounded-lg border border-linha-forte bg-superficie px-3 text-[15px] outline-none focus:border-acao';
+const classeLabel = 'block text-[13px] font-medium text-texto-2 mb-1.5';
 
 export default function FormularioAuth({ modo }: { modo: Modo }) {
   const textos = TEXTOS[modo];
@@ -52,7 +54,8 @@ export default function FormularioAuth({ modo }: { modo: Modo }) {
         return;
       }
       // Navegação completa para o proxy já enxergar o cookie novo.
-      window.location.replace(destinoPosLogin());
+      // Conta nova vai para o onboarding; login volta para onde o usuário estava.
+      window.location.replace(modo === 'cadastro' ? '/boas-vindas' : destinoPosLogin());
     } catch {
       setErro('Erro de conexão.');
     } finally {
@@ -65,16 +68,13 @@ export default function FormularioAuth({ modo }: { modo: Modo }) {
     : { texto: 'Já tem conta?', link: 'Entrar', href: '/login' };
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4">
-      <div className="w-full max-w-[400px]">
-        <div className="text-center mb-6">
-          <p className="text-[26px] font-bold text-[#111827]">FinScan</p>
-          <p className="text-[13px] text-[#6b7280] mt-1">{textos.subtitulo}</p>
-        </div>
+    <main className="flex-1 flex items-start md:items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        <p className="text-[17px] font-semibold tracking-tight">FinScan</p>
+        <h1 className="mt-8 text-[24px] font-semibold tracking-tight">{textos.titulo}</h1>
+        <p className="mt-1 text-texto-2">{textos.subtitulo}</p>
 
-        <form onSubmit={enviar} className="bg-white rounded-2xl border border-[#e8eaed] shadow-sm p-6 space-y-4">
-          <h1 className="text-[18px] font-bold text-[#111827]">{textos.titulo}</h1>
-
+        <form onSubmit={enviar} className="mt-6 space-y-4">
           {modo === 'cadastro' && (
             <div>
               <label htmlFor="nome" className={classeLabel}>Nome</label>
@@ -94,27 +94,23 @@ export default function FormularioAuth({ modo }: { modo: Modo }) {
             <input id="senha" type="password" required
               autoComplete={modo === 'cadastro' ? 'new-password' : 'current-password'}
               minLength={modo === 'cadastro' ? 8 : undefined} maxLength={72}
+              aria-describedby={modo === 'cadastro' ? 'dica-senha' : undefined}
               value={senha} onChange={(e) => setSenha(e.target.value)} className={classeInput} />
-            {modo === 'cadastro' && <p className="text-[11px] text-[#9ca3af] mt-1">Mínimo de 8 caracteres.</p>}
+            {modo === 'cadastro' && <p id="dica-senha" className="text-[13px] text-texto-3 mt-1.5">Mínimo de 8 caracteres.</p>}
           </div>
 
-          {erro && (
-            <p role="alert" className="text-[12px] font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              {erro}
-            </p>
-          )}
+          {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
-          <button type="submit" disabled={enviando}
-            className="w-full bg-[#111827] text-white text-[14px] font-bold rounded-lg py-3 hover:bg-black disabled:opacity-50 transition-all">
-            {enviando ? textos.enviando : textos.botao}
-          </button>
+          <Botao type="submit" disabled={enviando} className="w-full min-h-12">
+            {enviando ? <><Spinner /> {textos.enviando}</> : textos.botao}
+          </Botao>
         </form>
 
-        <p className="text-center text-[13px] text-[#6b7280] mt-4">
+        <p className="mt-6 text-[15px] text-texto-2">
           {outroModo.texto}{' '}
-          <Link href={outroModo.href} className="font-semibold text-[#1d4ed8] hover:underline">{outroModo.link}</Link>
+          <Link href={outroModo.href} className="font-semibold text-acao hover:underline underline-offset-2">{outroModo.link}</Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

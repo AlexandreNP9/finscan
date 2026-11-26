@@ -11,6 +11,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed.ts",
     "db:atribuir": "tsx scripts/atribuir-dados.ts",
+    "db:categorias-padrao": "tsx scripts/acrescentar-categorias-padrao.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

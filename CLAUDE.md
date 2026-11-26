@@ -25,6 +25,7 @@ pnpm db:generate  # generate a SQL migration in drizzle/ after editing lib/db/sc
 pnpm db:migrate   # apply pending migrations (also run automatically by the Docker CMD)
 pnpm db:seed [email]   # one-time import of data/*.json into Postgres (skips transactions if table non-empty); with email, imported transactions belong to that user
 pnpm db:atribuir <email>  # assign categories, agents and transactions with no owner (pre-auth data) to an existing user
+pnpm db:categorias-padrao [--simular] [nome ...]  # add categories (default: those added to CATEGORIAS_PADRAO later) to existing accounts and active groups, before "Outros"; idempotent
 pnpm db:studio    # Drizzle Studio
 docker compose up --build -d   # (repo root) app + Postgres (db exposed on host port 5433)
 docker compose up -d db        # (repo root) only Postgres, for running `pnpm dev` locally

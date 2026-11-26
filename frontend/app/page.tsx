@@ -3,14 +3,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { buscarApi } from '../lib/cliente';
-import { formatarBRL, formatarData, nomeMes, paraNumero } from '../lib/moeda';
+import { deslocarMes, formatarBRL, formatarData, nomeMes, paraNumero } from '../lib/moeda';
 import Estrutura from '../components/Estrutura';
 import Aviso from '../components/Aviso';
 import { LinkBotao } from '../components/Botao';
 import { ChevronIcon, CloseIcon } from '../components/icons';
 import type { Transacao } from '../types';
+import EvolucaoMensal, { type PontoMes } from '../components/painel/EvolucaoMensal';
+import RankingBarras from '../components/painel/RankingBarras';
 
 const MAX_CATEGORIAS = 5;
+const MAX_ESTABELECIMENTOS = 5;
+const MESES_EVOLUCAO = 6;
+const SEM_FONTE = 'Sem fonte pagadora';
 
 export default function Dashboard() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
@@ -31,7 +36,8 @@ export default function Dashboard() {
         const hoje = new Date();
         setMesSelecionado(
           data.transacoes.length > 0
-            ? data.transacoes[0].dataEmissao.substring(0, 7)
+            ? // Mês mais recente com compras (a lista vem por ordem de registro, não de data).
+              (data.transacoes as Transacao[]).reduce((maior, t) => (t.dataEmissao > maior ? t.dataEmissao : maior), '').substring(0, 7)
             : `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`,
         );
       })
@@ -51,27 +57,70 @@ export default function Dashboard() {
 
   const semFonte = useMemo(() => transacoes.filter((t) => !t.agenteOrigem).length, [transacoes]);
 
-  const { totalMes, qtdCompras, categorias, semCategoria } = useMemo(() => {
+  // Total e nº de compras de cada mês (para a evolução e a comparação com o mês anterior).
+  const resumoPorMes = useMemo(() => {
+    const porMes = new Map<string, { total: number; compras: number }>();
+    for (const t of transacoes) {
+      const mes = t.dataEmissao.substring(0, 7);
+      const r = porMes.get(mes) ?? { total: 0, compras: 0 };
+      r.total += paraNumero(t.valorTotal);
+      r.compras++;
+      porMes.set(mes, r);
+    }
+    return porMes;
+  }, [transacoes]);
+
+  // Meses corridos terminando no selecionado (meses sem compra entram com zero).
+  const evolucao: PontoMes[] = mesSelecionado
+    ? Array.from({ length: MESES_EVOLUCAO }, (_, i) => deslocarMes(mesSelecionado, i - (MESES_EVOLUCAO - 1))).map((mes) => ({
+        mes,
+        ...(resumoPorMes.get(mes) ?? { total: 0, compras: 0 }),
+      }))
+    : [];
+  const mesAnterior = mesSelecionado ? deslocarMes(mesSelecionado, -1) : '';
+  const totalAnterior = resumoPorMes.get(mesAnterior)?.total ?? 0;
+
+  const { totalMes, qtdCompras, categorias, semCategoria, fontes, estabelecimentos, maiorCompra } = useMemo(() => {
     let total = 0;
     let compras = 0;
     let semCat = 0;
-    const soma: Record<string, number> = {};
+    let maior: Transacao | null = null;
+    const porCategoria: Record<string, number> = {};
+    const porFonte: Record<string, number> = {};
+    const porEstabelecimento: Record<string, { valor: number; compras: number }> = {};
     for (const t of transacoes) {
       if (!t.dataEmissao.startsWith(mesSelecionado)) continue;
+      const valor = paraNumero(t.valorTotal);
       compras++;
-      total += paraNumero(t.valorTotal);
+      total += valor;
+      if (!maior || valor > paraNumero(maior.valorTotal)) maior = t;
+      const fonte = t.agenteOrigem || SEM_FONTE;
+      porFonte[fonte] = (porFonte[fonte] || 0) + valor;
+      const nomeEst = t.estabelecimento || 'Estabelecimento desconhecido';
+      const est = porEstabelecimento[nomeEst] ?? { valor: 0, compras: 0 };
+      est.valor += valor;
+      est.compras++;
+      porEstabelecimento[nomeEst] = est;
       for (const item of t.items ?? []) {
-        if (item.categoria) soma[item.categoria] = (soma[item.categoria] || 0) + paraNumero(item.vlTotal);
+        if (item.categoria) porCategoria[item.categoria] = (porCategoria[item.categoria] || 0) + paraNumero(item.vlTotal);
         else semCat += paraNumero(item.vlTotal);
       }
     }
-    const ordenadas = Object.entries(soma)
-      .map(([nome, valor]) => ({ nome, valor }))
-      .sort((a, b) => b.valor - a.valor);
-    return { totalMes: total, qtdCompras: compras, categorias: ordenadas, semCategoria: semCat };
+    const ordenar = (r: Record<string, number>) =>
+      Object.entries(r).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
+    return {
+      totalMes: total,
+      qtdCompras: compras,
+      categorias: ordenar(porCategoria),
+      semCategoria: semCat,
+      fontes: ordenar(porFonte),
+      estabelecimentos: Object.entries(porEstabelecimento)
+        .map(([nome, e]) => ({ nome, valor: e.valor, compras: e.compras }))
+        .sort((a, b) => b.valor - a.valor),
+      maiorCompra: maior as Transacao | null,
+    };
   }, [transacoes, mesSelecionado]);
 
-  const maiorCategoria = categorias[0]?.valor || 1;
   const visiveis = categorias.slice(0, MAX_CATEGORIAS);
   const restante = categorias.slice(MAX_CATEGORIAS).reduce((s, c) => s + c.valor, 0);
 
@@ -146,10 +195,28 @@ export default function Dashboard() {
             <ChevronIcon className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-texto-3" />
           </div>
         </div>
-        <p className="mt-1 text-[36px] md:text-[44px] font-semibold tracking-tight tabular-nums leading-tight">{formatarBRL(totalMes)}</p>
-        <p className="text-[14px] text-texto-3">
-          {qtdCompras} {qtdCompras === 1 ? 'compra' : 'compras'}
-        </p>
+        <p className="mt-1 text-[36px] md:text-[48px] font-semibold tracking-tight leading-tight">{formatarBRL(totalMes)}</p>
+        <Variacao atual={totalMes} anterior={totalAnterior} mesAnterior={mesAnterior} />
+
+        <dl className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 md:max-w-2xl">
+          <div>
+            <dt className="text-[13px] text-texto-3">Compras</dt>
+            <dd className="text-[20px] font-semibold">{qtdCompras}</dd>
+          </div>
+          <div>
+            <dt className="text-[13px] text-texto-3">Gasto médio por compra</dt>
+            <dd className="text-[20px] font-semibold">{formatarBRL(qtdCompras ? totalMes / qtdCompras : 0)}</dd>
+          </div>
+          {maiorCompra && (
+            <div className="col-span-2 sm:col-span-1 min-w-0">
+              <dt className="text-[13px] text-texto-3">Maior compra</dt>
+              <dd className="text-[20px] font-semibold">{formatarBRL(maiorCompra.valorTotal)}</dd>
+              <dd className="truncate text-[13px] text-texto-3">
+                {maiorCompra.estabelecimento || 'Estabelecimento desconhecido'} · {formatarData(maiorCompra.dataEmissao)}
+              </dd>
+            </div>
+          )}
+        </dl>
       </section>
 
       {pendentes > 0 && (
@@ -170,47 +237,52 @@ export default function Dashboard() {
         </Aviso>
       )}
 
-      <section aria-labelledby="titulo-categorias" className="mt-10 md:max-w-2xl">
-        <h2 id="titulo-categorias" className="text-[15px] font-semibold">Por categoria</h2>
-        {visiveis.length === 0 ? (
-          <p className="mt-3 text-[14px] text-texto-3">Nenhum item categorizado neste mês.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-linha">
-            {visiveis.map((cat) => (
-              <li key={cat.nome}>
-                <button
-                  type="button"
-                  onClick={() => setCategoriaDetalhe(cat.nome)}
-                  className="w-full py-3 text-left group"
-                >
-                  <span className="flex items-baseline justify-between gap-4">
-                    <span className="text-[15px] group-hover:underline underline-offset-2">{cat.nome}</span>
-                    <span className="valor text-[15px] font-medium">{formatarBRL(cat.valor)}</span>
-                  </span>
-                  <span className="mt-2 block h-1 rounded-full bg-linha">
-                    <span className="block h-1 rounded-full bg-texto-2" style={{ width: `${(cat.valor / maiorCategoria) * 100}%` }} />
-                  </span>
-                </button>
-              </li>
-            ))}
-            {restante > 0 && (
-              <li className="py-3 flex justify-between gap-4 text-[14px] text-texto-3">
-                <span>Outras {categorias.length - MAX_CATEGORIAS} categorias</span>
-                <span className="valor">{formatarBRL(restante)}</span>
-              </li>
-            )}
-            {semCategoria > 0 && (
-              <li className="py-3 flex justify-between gap-4 text-[14px] text-texto-3">
-                <span>Sem categoria</span>
-                <span className="valor">{formatarBRL(semCategoria)}</span>
-              </li>
-            )}
-          </ul>
-        )}
-        <Link href="/historico" className="mt-4 inline-flex min-h-11 items-center text-[15px] font-medium text-acao hover:underline underline-offset-2">
-          Ver todas as compras
-        </Link>
-      </section>
+      <div className="mt-10 md:max-w-2xl">
+        <EvolucaoMensal
+          pontos={evolucao}
+          selecionado={mesSelecionado}
+          podeSelecionar={(mes) => mesesDisponiveis.includes(mes)}
+          aoSelecionar={setMesSelecionado}
+        />
+      </div>
+
+      <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-x-12">
+        <RankingBarras
+          id="titulo-categorias"
+          titulo="Por categoria"
+          total={totalMes}
+          vazio="Nenhum item categorizado neste mês."
+          linhas={visiveis.map((c) => ({ ...c, aoClicar: () => setCategoriaDetalhe(c.nome) }))}
+          rodape={[
+            { nome: `Outras ${categorias.length - MAX_CATEGORIAS} categorias`, valor: restante },
+            { nome: 'Sem categoria', valor: semCategoria },
+          ]}
+        />
+
+        <RankingBarras
+          id="titulo-fontes"
+          titulo="Por fonte pagadora"
+          total={totalMes}
+          vazio="Nenhuma compra neste mês."
+          linhas={fontes}
+        />
+
+        <RankingBarras
+          id="titulo-estabelecimentos"
+          titulo="Onde você mais gasta"
+          total={totalMes}
+          vazio="Nenhuma compra neste mês."
+          linhas={estabelecimentos.slice(0, MAX_ESTABELECIMENTOS).map((e) => ({
+            nome: e.nome,
+            valor: e.valor,
+            detalhe: `${e.compras} ${e.compras === 1 ? 'compra' : 'compras'}`,
+          }))}
+        />
+      </div>
+
+      <Link href="/historico" className="mt-6 inline-flex min-h-11 items-center text-[15px] font-medium text-acao hover:underline underline-offset-2">
+        Ver todas as compras
+      </Link>
 
       {categoriaDetalhe && (
         <div
@@ -253,5 +325,25 @@ export default function Dashboard() {
         </div>
       )}
     </Estrutura>
+  );
+}
+
+/** "↑ 12% (R$ 120,00 a mais) que em outubro". Neutro: gastar mais não é bom nem ruim por si só. */
+function Variacao({ atual, anterior, mesAnterior }: { atual: number; anterior: number; mesAnterior: string }) {
+  const nome = nomeMes(mesAnterior).replace(/ de \d{4}$/, '');
+  if (anterior <= 0) {
+    return <p className="text-[14px] text-texto-3">Sem compras em {nome} para comparar.</p>;
+  }
+  const diferenca = atual - anterior;
+  const pct = Math.round((Math.abs(diferenca) / anterior) * 100);
+  if (Math.abs(diferenca) < 0.005) {
+    return <p className="text-[14px] text-texto-2">Igual a {nome}.</p>;
+  }
+  const subiu = diferenca > 0;
+  return (
+    <p className="text-[14px] text-texto-2">
+      <span aria-hidden>{subiu ? '↑' : '↓'} </span>
+      <span className="font-medium">{pct}%</span> ({formatarBRL(Math.abs(diferenca))} a {subiu ? 'mais' : 'menos'}) que em {nome}
+    </p>
   );
 }

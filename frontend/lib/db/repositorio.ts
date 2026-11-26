@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, getTableColumns, gt, inArray, isNull, lte, notInArray, sql, type Column } from 'drizzle-orm';
 import { db, type Db } from './index';
-import { agentes, categorias, itens, sessoes, transacoes, usuarios } from './schema';
+import { agentes, categorias, grupos, itens, sessoes, transacoes, usuarios } from './schema';
 import { brParaNumeric, ErroValidacao, numericParaBr, validarData, validarHora } from './formato';
 import { CATEGORIAS_PADRAO } from './categorias-padrao';
 import type { Item, Transacao } from '../../types';
@@ -13,96 +13,126 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type TabelaLista = typeof categorias | typeof agentes;
 
 /**
- * Filtro "pertence a este dono". `usuarioId` null só ocorre no seed sem e-mail, que trabalha com
- * os dados ainda sem dono.
+ * De quem são os dados que uma operação lê ou grava: a conta pessoal de um usuário ou um grupo.
+ * Em `pessoal`, `usuarioId` null só ocorre no seed sem e-mail, que trabalha com os dados ainda
+ * sem dono. Em `grupo`, `usuarioId` é quem está agindo (vira o autor das transações que registrar).
  */
+export type Escopo =
+  | { tipo: 'pessoal'; usuarioId: number | null }
+  | { tipo: 'grupo'; usuarioId: number; grupoId: number };
+
+export const escopoPessoal = (usuarioId: number | null): Escopo => ({ tipo: 'pessoal', usuarioId });
+
 function doDono(coluna: Column, usuarioId: number | null) {
   return usuarioId === null ? isNull(coluna) : eq(coluna, usuarioId);
 }
 
-// ---------- Categorias / Agentes (listas de nomes, uma por usuário) ----------
+/**
+ * Filtro "pertence a este escopo" para tabelas com `usuario_id` + `grupo_id`. No pessoal, exigir
+ * `grupo_id` null é essencial: transações de grupo também guardam o `usuario_id` de quem registrou.
+ */
+function doEscopo(tabela: { usuarioId: Column; grupoId: Column }, e: Escopo) {
+  return e.tipo === 'grupo' ? eq(tabela.grupoId, e.grupoId) : and(doDono(tabela.usuarioId, e.usuarioId), isNull(tabela.grupoId));
+}
 
-export async function listarNomes(tabela: TabelaLista, usuarioId: number): Promise<string[]> {
+/** Colunas de dono de uma linha nova de categoria/agente. */
+function donoDaLista(e: Escopo) {
+  return e.tipo === 'grupo' ? { usuarioId: null, grupoId: e.grupoId } : { usuarioId: e.usuarioId, grupoId: null };
+}
+
+// ---------- Categorias / Agentes (listas de nomes, uma por dono) ----------
+
+export async function listarNomes(tabela: TabelaLista, escopo: Escopo): Promise<string[]> {
   const linhas = await db
     .select({ nome: tabela.nome })
     .from(tabela)
-    .where(eq(tabela.usuarioId, usuarioId))
+    .where(doEscopo(tabela, escopo))
     .orderBy(asc(tabela.ordem), asc(tabela.id));
   return linhas.map((l) => l.nome);
 }
 
-/** Substitui a lista inteira do usuário (semântica do POST das telas de gerenciamento). */
-export async function substituirLista(tabela: TabelaLista, nomes: unknown, usuarioId: number): Promise<void> {
+/** Substitui a lista inteira do dono (semântica do POST das telas de gerenciamento). */
+export async function substituirLista(tabela: TabelaLista, nomes: unknown, escopo: Escopo): Promise<void> {
   if (!Array.isArray(nomes) || nomes.some((n) => typeof n !== 'string')) {
     throw new ErroValidacao('A lista deve ser um array de textos.');
   }
   const limpos = [...new Set((nomes as string[]).map((n) => n.trim()).filter(Boolean))];
-  const doUsuario = eq(tabela.usuarioId, usuarioId);
+  const doDonoDaLista = doEscopo(tabela, escopo);
+  const dono = donoDaLista(escopo);
 
   await db.transaction(async (tx) => {
     if (limpos.length > 0) {
-      await tx.delete(tabela).where(and(doUsuario, notInArray(tabela.nome, limpos)));
+      await tx.delete(tabela).where(and(doDonoDaLista, notInArray(tabela.nome, limpos)));
       await tx
         .insert(tabela)
-        .values(limpos.map((nome, ordem) => ({ usuarioId, nome, ordem })))
-        .onConflictDoUpdate({ target: [tabela.usuarioId, tabela.nome], set: { ordem: sql`excluded.ordem` } });
+        .values(limpos.map((nome, ordem) => ({ ...dono, nome, ordem })))
+        .onConflictDoUpdate({ target: [tabela.usuarioId, tabela.grupoId, tabela.nome], set: { ordem: sql`excluded.ordem` } });
     } else {
-      await tx.delete(tabela).where(doUsuario);
+      await tx.delete(tabela).where(doDonoDaLista);
     }
   });
 }
 
 /** Acrescenta nomes ao fim da lista do dono, ignorando os que já existem (usado pelo seed). */
-export async function acrescentarNomes(tabela: TabelaLista, nomes: string[], usuarioId: number | null): Promise<void> {
+export async function acrescentarNomes(tabela: TabelaLista, nomes: string[], escopo: Escopo): Promise<void> {
   if (nomes.length === 0) return;
   const [{ maior }] = await db
     .select({ maior: sql<number>`coalesce(max(${tabela.ordem}), -1)::int` })
     .from(tabela)
-    .where(doDono(tabela.usuarioId, usuarioId));
+    .where(doEscopo(tabela, escopo));
   await db
     .insert(tabela)
-    .values(nomes.map((nome, i) => ({ usuarioId, nome, ordem: maior + 1 + i })))
-    .onConflictDoNothing({ target: [tabela.usuarioId, tabela.nome] });
+    .values(nomes.map((nome, i) => ({ ...donoDaLista(escopo), nome, ordem: maior + 1 + i })))
+    .onConflictDoNothing({ target: [tabela.usuarioId, tabela.grupoId, tabela.nome] });
 }
 
-// ---------- Objetivo do usuário e remapeamento de categorias ----------
+// ---------- Objetivo (do usuário ou do grupo) e remapeamento de categorias ----------
 
 const TAMANHO_MAX_OBJETIVO = 300;
 
-export async function lerObjetivo(usuarioId: number): Promise<string> {
-  const [linha] = await db.select({ objetivo: usuarios.objetivo }).from(usuarios).where(eq(usuarios.id, usuarioId));
+export async function lerObjetivo(escopo: Escopo): Promise<string> {
+  const [linha] =
+    escopo.tipo === 'grupo'
+      ? await db.select({ objetivo: grupos.objetivo }).from(grupos).where(eq(grupos.id, escopo.grupoId))
+      : escopo.usuarioId === null
+        ? []
+        : await db.select({ objetivo: usuarios.objetivo }).from(usuarios).where(eq(usuarios.id, escopo.usuarioId));
   return linha?.objetivo ?? '';
 }
 
-export async function gravarObjetivo(usuarioId: number, objetivo: unknown): Promise<string> {
+export async function gravarObjetivo(escopo: Escopo, objetivo: unknown): Promise<string> {
   if (typeof objetivo !== 'string') throw new ErroValidacao('O objetivo deve ser um texto.');
   const limpo = objetivo.trim();
   if (limpo.length > TAMANHO_MAX_OBJETIVO) {
     throw new ErroValidacao(`O objetivo pode ter no máximo ${TAMANHO_MAX_OBJETIVO} caracteres.`);
   }
-  await db.update(usuarios).set({ objetivo: limpo }).where(eq(usuarios.id, usuarioId));
+  if (escopo.tipo === 'grupo') {
+    await db.update(grupos).set({ objetivo: limpo }).where(eq(grupos.id, escopo.grupoId));
+  } else if (escopo.usuarioId !== null) {
+    await db.update(usuarios).set({ objetivo: limpo }).where(eq(usuarios.id, escopo.usuarioId));
+  }
   return limpo;
 }
 
 export type ItemCategorizado = { id: number; descricao: string; categoria: string };
 
 /**
- * Itens já categorizados do usuário (os mais recentes primeiro), exceto os da categoria
+ * Itens já categorizados do escopo (os mais recentes primeiro), exceto os da categoria
  * informada: candidatos a serem movidos para ela.
  */
-export async function listarItensCategorizados(usuarioId: number, excetoCategoria: string, limite: number): Promise<ItemCategorizado[]> {
+export async function listarItensCategorizados(escopo: Escopo, excetoCategoria: string, limite: number): Promise<ItemCategorizado[]> {
   return db
     .select({ id: itens.id, descricao: itens.descricao, categoria: categorias.nome })
     .from(itens)
     .innerJoin(transacoes, eq(itens.transacaoId, transacoes.id))
     .innerJoin(categorias, eq(itens.categoriaId, categorias.id))
-    .where(and(eq(transacoes.usuarioId, usuarioId), sql`${categorias.nome} <> ${excetoCategoria}`))
+    .where(and(doEscopo(transacoes, escopo), sql`${categorias.nome} <> ${excetoCategoria}`))
     .orderBy(desc(transacoes.dataEmissao), desc(itens.id))
     .limit(limite);
 }
 
-/** Move itens do usuário para uma categoria dele. Ids de outros usuários são ignorados. */
-export async function moverItensParaCategoria(usuarioId: number, idsItens: unknown, nomeCategoria: unknown): Promise<number> {
+/** Move itens do escopo para uma categoria dele. Ids de fora do escopo são ignorados. */
+export async function moverItensParaCategoria(escopo: Escopo, idsItens: unknown, nomeCategoria: unknown): Promise<number> {
   if (!Array.isArray(idsItens) || idsItens.some((id) => !Number.isInteger(id))) {
     throw new ErroValidacao('"itens" deve ser uma lista de ids.');
   }
@@ -110,7 +140,7 @@ export async function moverItensParaCategoria(usuarioId: number, idsItens: unkno
   const [categoria] = await db
     .select({ id: categorias.id })
     .from(categorias)
-    .where(and(eq(categorias.usuarioId, usuarioId), eq(categorias.nome, nome)));
+    .where(and(doEscopo(categorias, escopo), eq(categorias.nome, nome)));
   if (!categoria) throw new ErroValidacao(`Categoria "${nome}" não está cadastrada.`);
   if (idsItens.length === 0) return 0;
 
@@ -120,7 +150,7 @@ export async function moverItensParaCategoria(usuarioId: number, idsItens: unkno
     .where(
       and(
         inArray(itens.id, idsItens as number[]),
-        inArray(itens.transacaoId, db.select({ id: transacoes.id }).from(transacoes).where(eq(transacoes.usuarioId, usuarioId))),
+        inArray(itens.transacaoId, db.select({ id: transacoes.id }).from(transacoes).where(doEscopo(transacoes, escopo))),
       ),
     )
     .returning({ id: itens.id });
@@ -129,14 +159,14 @@ export async function moverItensParaCategoria(usuarioId: number, idsItens: unkno
 
 // ---------- Transações ----------
 
-/** Transações do usuário (as mais recentes primeiro). */
-export async function listarTransacoes(usuarioId: number): Promise<Transacao[]> {
+/** Transações do escopo (as mais recentes primeiro). */
+export async function listarTransacoes(escopo: Escopo): Promise<Transacao[]> {
   const cabecalhos = await db
     .select({ ...getTableColumns(transacoes), agente: agentes.nome, usuario: usuarios.nome })
     .from(transacoes)
     .leftJoin(agentes, eq(transacoes.agenteId, agentes.id))
     .leftJoin(usuarios, eq(transacoes.usuarioId, usuarios.id))
-    .where(eq(transacoes.usuarioId, usuarioId))
+    .where(doEscopo(transacoes, escopo))
     .orderBy(desc(transacoes.id));
 
   const linhasItens = await db
@@ -144,7 +174,7 @@ export async function listarTransacoes(usuarioId: number): Promise<Transacao[]> 
     .from(itens)
     .innerJoin(transacoes, eq(itens.transacaoId, transacoes.id))
     .leftJoin(categorias, eq(itens.categoriaId, categorias.id))
-    .where(eq(transacoes.usuarioId, usuarioId))
+    .where(doEscopo(transacoes, escopo))
     .orderBy(asc(itens.transacaoId), asc(itens.ordem), asc(itens.id));
 
   const itensPorTransacao = new Map<number, Item[]>();
@@ -178,17 +208,21 @@ export async function listarTransacoes(usuarioId: number): Promise<Transacao[]> 
 }
 
 /**
- * Insere uma transação vinda da UI, registrada por `usuarioId` (null só no seed sem usuário).
- * Ids de itens enviados pelo cliente são ignorados.
+ * Insere uma transação vinda da UI no escopo; o autor é `escopo.usuarioId` (null só no seed sem
+ * usuário). Ids de itens enviados pelo cliente são ignorados.
  */
-export async function criarTransacao(payload: unknown, usuarioId: number | null): Promise<number> {
+export async function criarTransacao(payload: unknown, escopo: Escopo): Promise<number> {
   const p = exigirObjeto(payload, 'transação');
   const itensEntrada = exigirItens(p.items);
 
   return db.transaction(async (tx) => {
-    const cabecalho = await lerCabecalho(tx, p, usuarioId);
-    const [{ id }] = await tx.insert(transacoes).values({ ...cabecalho, usuarioId }).returning({ id: transacoes.id });
-    const categoriaIds = await resolverCategorias(tx, itensEntrada, usuarioId);
+    const cabecalho = await lerCabecalho(tx, p, escopo);
+    const grupoId = escopo.tipo === 'grupo' ? escopo.grupoId : null;
+    const [{ id }] = await tx
+      .insert(transacoes)
+      .values({ ...cabecalho, usuarioId: escopo.usuarioId, grupoId })
+      .returning({ id: transacoes.id });
+    const categoriaIds = await resolverCategorias(tx, itensEntrada, escopo);
     if (itensEntrada.length > 0) {
       await tx.insert(itens).values(itensEntrada.map((i, ordem) => lerItem(i, ordem, id, categoriaIds)));
     }
@@ -199,27 +233,29 @@ export async function criarTransacao(payload: unknown, usuarioId: number | null)
 /**
  * Substitui cabeçalho e itens de uma transação existente. Itens cujo `id` já pertence à transação
  * são atualizados, os demais são inseridos e os que sumiram do payload são removidos.
- * Retorna false se a transação não existir ou não pertencer a `usuarioId`.
+ * Retorna false se a transação não existir ou não pertencer ao escopo.
  */
-export async function atualizarTransacao(payload: unknown, usuarioId: number): Promise<boolean> {
+export async function atualizarTransacao(payload: unknown, escopo: Escopo): Promise<boolean> {
   const p = exigirObjeto(payload, 'transação');
   if (typeof p.id !== 'number') throw new ErroValidacao('Transação sem id.');
   const transacaoId = p.id;
   const itensEntrada = exigirItens(p.items);
 
   return db.transaction(async (tx) => {
-    const cabecalho = await lerCabecalho(tx, p, usuarioId);
-    const atualizadas = await tx
-      .update(transacoes)
-      .set(cabecalho)
-      .where(and(eq(transacoes.id, transacaoId), eq(transacoes.usuarioId, usuarioId)))
-      .returning({ id: transacoes.id });
-    if (atualizadas.length === 0) return false;
+    // Dono primeiro: transação de outro escopo é "não encontrada", sem validar o resto do payload.
+    const [existente] = await tx
+      .select({ id: transacoes.id })
+      .from(transacoes)
+      .where(and(eq(transacoes.id, transacaoId), doEscopo(transacoes, escopo)));
+    if (!existente) return false;
+
+    const cabecalho = await lerCabecalho(tx, p, escopo);
+    await tx.update(transacoes).set(cabecalho).where(eq(transacoes.id, transacaoId));
 
     const existentes = new Set(
       (await tx.select({ id: itens.id }).from(itens).where(eq(itens.transacaoId, transacaoId))).map((l) => l.id),
     );
-    const categoriaIds = await resolverCategorias(tx, itensEntrada, usuarioId);
+    const categoriaIds = await resolverCategorias(tx, itensEntrada, escopo);
     const mantidos = new Set<number>();
 
     for (const [ordem, entrada] of itensEntrada.entries()) {
@@ -262,7 +298,7 @@ export async function atribuirDadosSemDono(usuarioId: number): Promise<ResumoAtr
     const trans = await tx
       .update(transacoes)
       .set({ usuarioId })
-      .where(isNull(transacoes.usuarioId))
+      .where(and(isNull(transacoes.usuarioId), isNull(transacoes.grupoId)))
       .returning({ id: transacoes.id });
     return {
       categorias: { vinculadas: cat.vinculados, mescladas: cat.mesclados },
@@ -279,17 +315,17 @@ async function atribuirListaSemDono(
   redirecionar: (idSemDono: number, idDoUsuario: number) => Promise<void>,
 ): Promise<{ vinculados: number; mesclados: number }> {
   const doUsuario = new Map(
-    (await tx.select({ id: tabela.id, nome: tabela.nome }).from(tabela).where(eq(tabela.usuarioId, usuarioId)))
+    (await tx.select({ id: tabela.id, nome: tabela.nome }).from(tabela).where(doEscopo(tabela, escopoPessoal(usuarioId))))
       .map((l) => [l.nome, l.id]),
   );
   const [{ maior }] = await tx
     .select({ maior: sql<number>`coalesce(max(${tabela.ordem}), -1)::int` })
     .from(tabela)
-    .where(eq(tabela.usuarioId, usuarioId));
+    .where(doEscopo(tabela, escopoPessoal(usuarioId)));
   const semDono = await tx
     .select({ id: tabela.id, nome: tabela.nome })
     .from(tabela)
-    .where(isNull(tabela.usuarioId))
+    .where(doEscopo(tabela, escopoPessoal(null)))
     .orderBy(asc(tabela.ordem), asc(tabela.id));
 
   let vinculados = 0;
@@ -383,14 +419,14 @@ function texto(valor: unknown): string {
   return typeof valor === 'string' ? valor.trim() : valor === undefined || valor === null ? '' : String(valor).trim();
 }
 
-async function lerCabecalho(tx: Tx, p: Objeto, usuarioId: number | null) {
+async function lerCabecalho(tx: Tx, p: Objeto, escopo: Escopo) {
   const nomeAgente = texto(p.agenteOrigem);
   let agenteId: number | null = null;
   if (nomeAgente) {
     const [agente] = await tx
       .select({ id: agentes.id })
       .from(agentes)
-      .where(and(doDono(agentes.usuarioId, usuarioId), eq(agentes.nome, nomeAgente)));
+      .where(and(doEscopo(agentes, escopo), eq(agentes.nome, nomeAgente)));
     if (!agente) throw new ErroValidacao(`Agente "${nomeAgente}" não está cadastrado.`);
     agenteId = agente.id;
   }
@@ -406,15 +442,15 @@ async function lerCabecalho(tx: Tx, p: Objeto, usuarioId: number | null) {
   };
 }
 
-/** Mapeia nome → id das categorias do usuário usadas pelos itens; erro se alguma não estiver cadastrada. */
-async function resolverCategorias(tx: Tx, itensEntrada: Objeto[], usuarioId: number | null): Promise<Map<string, number>> {
+/** Mapeia nome → id das categorias do escopo usadas pelos itens; erro se alguma não estiver cadastrada. */
+async function resolverCategorias(tx: Tx, itensEntrada: Objeto[], escopo: Escopo): Promise<Map<string, number>> {
   const nomes = [...new Set(itensEntrada.map((i) => texto(i.categoria)).filter(Boolean))];
   if (nomes.length === 0) return new Map();
 
   const linhas = await tx
     .select({ id: categorias.id, nome: categorias.nome })
     .from(categorias)
-    .where(and(doDono(categorias.usuarioId, usuarioId), inArray(categorias.nome, nomes)));
+    .where(and(doEscopo(categorias, escopo), inArray(categorias.nome, nomes)));
   const mapa = new Map(linhas.map((l) => [l.nome, l.id]));
   const faltando = nomes.filter((n) => !mapa.has(n));
   if (faltando.length > 0) {

@@ -12,6 +12,9 @@ import type { Item, Transacao } from '../../types';
 
 type Grupo = { mes: string; total: number; transacoes: Transacao[] };
 
+/** Minúsculas e sem acento, para a busca achar "acougue" em "Açougue". */
+const normalizar = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 // useSearchParams exige um limite de Suspense para a rota continuar pré-renderizada.
 export default function Historico() {
   return (
@@ -37,6 +40,7 @@ function ConteudoHistorico() {
   const [isLoading, setIsLoading] = useState(true);
   const [erro, setErro] = useState('');
   const [expandidoId, setExpandidoId] = useState<number | null>(null);
+  const [busca, setBusca] = useState('');
   const [listaAgentes, setListaAgentes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -68,10 +72,13 @@ function ConteudoHistorico() {
 
   const semFonte = transacoes.filter((t) => !t.agenteOrigem).length;
 
+  const termo = normalizar(busca.trim());
   const grupos = useMemo(() => {
     const porMes = new Map<string, Grupo>();
     for (const t of transacoes) {
       if (soSemFonte && t.agenteOrigem) continue;
+      // Busca pelo estabelecimento ou por qualquer item da compra.
+      if (termo && !normalizar(t.estabelecimento).includes(termo) && !t.items.some((i) => normalizar(i.descricao).includes(termo))) continue;
       const mes = t.dataEmissao.substring(0, 7);
       const g = porMes.get(mes) ?? { mes, total: 0, transacoes: [] };
       g.total += paraNumero(t.valorTotal);
@@ -79,7 +86,9 @@ function ConteudoHistorico() {
       porMes.set(mes, g);
     }
     return Array.from(porMes.values());
-  }, [transacoes, soSemFonte]);
+  }, [transacoes, soSemFonte, termo]);
+
+  const encontradas = grupos.reduce((n, g) => n + g.transacoes.length, 0);
 
   const pendentes = transacoes.filter((t) => t.items?.some((i) => i.categoria === '')).length;
   const alternar = (id: number) => setExpandidoId(expandidoId === id ? null : id);
@@ -108,6 +117,24 @@ function ConteudoHistorico() {
         </div>
       ) : (
         <>
+        <div className="mt-6 md:max-w-md">
+          <label htmlFor="busca" className="sr-only">Buscar compras</label>
+          <input
+            id="busca"
+            type="search"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por estabelecimento ou item"
+            className="w-full min-h-11 rounded-lg border border-linha-forte bg-superficie px-3 text-[15px] outline-none focus:border-acao"
+          />
+          {termo && (
+            <p role="status" className="mt-2 text-[14px] text-texto-3">
+              {encontradas === 0
+                ? `Nenhuma compra encontrada para “${busca.trim()}”.`
+                : `${encontradas} ${encontradas === 1 ? 'compra encontrada' : 'compras encontradas'}.`}
+            </p>
+          )}
+        </div>
         {soSemFonte && (
           <Aviso tipo={semFonte > 0 ? 'alerta' : 'sucesso'} className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <span>

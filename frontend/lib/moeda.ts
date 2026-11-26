@@ -51,3 +51,16 @@ export function paraCentavos(texto: string): number | null {
 export function centavosParaBR(centavos: number): string {
   return `${Math.floor(centavos / 100)},${String(centavos % 100).padStart(2, '0')}`;
 }
+
+/** "2026-11" → "nov" (rótulo curto para eixos). */
+export function mesCurto(mesAno: string): string {
+  const [ano, mes] = mesAno.split('-').map(Number);
+  return new Date(ano, mes - 1).toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
+}
+
+/** "2026-11" → "2026-10" (deslocamento em meses; negativo volta no tempo). */
+export function deslocarMes(mesAno: string, delta: number): string {
+  const [ano, mes] = mesAno.split('-').map(Number);
+  const d = new Date(ano, mes - 1 + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}

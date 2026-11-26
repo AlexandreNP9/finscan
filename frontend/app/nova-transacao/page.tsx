@@ -11,6 +11,7 @@ import { formatarBRL, formatarData } from '../../lib/moeda';
 import Estrutura from '../../components/Estrutura';
 import Aviso from '../../components/Aviso';
 import Botao, { Spinner } from '../../components/Botao';
+import FormularioManual from './FormularioManual';
 
 type DadosExtraidos = {
   sucesso?: boolean;
@@ -28,6 +29,8 @@ const campo = 'w-full min-h-11 rounded-lg border border-linha-forte bg-superfici
 export default function NovaTransacao() {
   const router = useRouter();
   const [etapa, setEtapa] = useState<1 | 2>(1);
+  // Gasto sem nota fiscal: substitui as duas etapas por um formulário único.
+  const [modoManual, setModoManual] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isPastingHtml, setIsPastingHtml] = useState(false);
   const [htmlInput, setHtmlInput] = useState('');
@@ -125,6 +128,7 @@ export default function NovaTransacao() {
 
   const limparFormulario = () => {
     setEtapa(1);
+    setModoManual(false);
     setIsScanning(false);
     setIsPastingHtml(false);
     setHtmlInput('');
@@ -173,6 +177,24 @@ export default function NovaTransacao() {
     reader.onload = (event) => setHtmlInput(event.target?.result as string);
     reader.readAsText(file);
   };
+
+  const aoSalvarManual = () => {
+    limparFormulario();
+    router.push('/');
+  };
+
+  if (modoManual) {
+    return (
+      <Estrutura semNavInferior>
+        <FormularioManual
+          listaAgentes={listaAgentes}
+          agentesCarregados={agentesCarregados}
+          aoVoltar={() => setModoManual(false)}
+          aoSalvar={aoSalvarManual}
+        />
+      </Estrutura>
+    );
+  }
 
   return (
     <Estrutura semNavInferior={etapa === 2}>
@@ -224,6 +246,14 @@ export default function NovaTransacao() {
               </div>
             </div>
           )}
+
+          <div className="mt-8 pt-6 border-t border-linha">
+            <h2 className="text-[15px] font-semibold">Gasto sem nota fiscal?</h2>
+            <p className="mt-1 text-[14px] text-texto-3">Aluguel, água, luz, condomínio, doações… preencha os dados você mesmo.</p>
+            <Botao variante="secundario" onClick={() => { setErroCaptura(''); setModoManual(true); }} className="mt-4 w-full">
+              Preencher manualmente
+            </Botao>
+          </div>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { NextResponse, connection } from 'next/server';
-import { atualizarTransacao, criarTransacao, listarTransacoes } from '../../../lib/db/repositorio';
+import { atualizarTransacao, criarTransacao, excluirTransacao, listarTransacoes } from '../../../lib/db/repositorio';
 import { respostaDeErro } from '../../../lib/api';
 import { exigirEscopo } from '../../../lib/auth';
 
@@ -35,5 +35,19 @@ export async function PUT(request: Request) {
     return NextResponse.json({ sucesso: true });
   } catch (error) {
     return respostaDeErro(error, 'Erro ao atualizar');
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { escopo } = await exigirEscopo();
+    const corpo = await request.json().catch(() => null);
+    const encontrada = await excluirTransacao(corpo?.id, escopo);
+    if (!encontrada) {
+      return NextResponse.json({ sucesso: false, erro: 'Transação não encontrada' }, { status: 404 });
+    }
+    return NextResponse.json({ sucesso: true });
+  } catch (error) {
+    return respostaDeErro(error, 'Erro ao excluir transação');
   }
 }

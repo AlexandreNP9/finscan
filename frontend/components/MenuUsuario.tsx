@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { buscarApi } from '../lib/cliente';
 
-/** Inicial do usuário que abre um menu com os ajustes (categorias, fontes pagadoras) e o "Sair". */
+/** Inicial do usuário que abre um menu com os ajustes (categorias, fontes pagadoras, grupos) e o "Sair". */
 export default function MenuUsuario() {
   const [nome, setNome] = useState('');
   const [aberto, setAberto] = useState(false);
@@ -62,6 +62,7 @@ export default function MenuUsuario() {
           <div className="border-t border-linha my-1" />
           <Link role="menuitem" href="/categorias" className={item} onClick={() => setAberto(false)}>Categorias</Link>
           <Link role="menuitem" href="/agentes" className={item} onClick={() => setAberto(false)}>Fontes pagadoras</Link>
+          <Link role="menuitem" href="/grupos" className={item} onClick={() => setAberto(false)}>Grupos</Link>
           <div className="border-t border-linha my-1" />
           <button role="menuitem" type="button" onClick={sair} disabled={saindo} className={`${item} text-erro disabled:opacity-50`}>
             {saindo ? 'Saindo…' : 'Sair'}
